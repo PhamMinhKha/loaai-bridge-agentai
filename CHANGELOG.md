@@ -5,6 +5,12 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 ## [Unreleased] — 2026-08-14
 
 ### Added
+- **Chụp màn hình PC** gửi qua WebSocket: client `{ "type": "screenshot" }` hoặc nói
+  “chụp màn hình”; server trả JPEG base64 (`type: screenshot`). Nút trên web UI.
+  ESP32 (Opus) nhận bản thu nhỏ; không gửi JPEG binary (firmware hiểu nhầm audio).
+- Lệnh thoại **tạm biệt / kết thúc / good bye**: cả câu đúng cụm đó thì không gọi
+  agent — về `idle`. Web (PCM) đóng WS; ESP32 giữ kết nối, bỏ audio đến `audio_start`.
+- Dump STT (text + WAV) vào `data/stt/` khi `STT_DUMP=true`.
 - **Tab "📖 Cấu hình ESP32"** trên web UI (`public/index.html`): hướng dẫn cấu hình
   firmware xiaozhi-esp32 kết nối gateway. Bao gồm địa chỉ WS động (`ws://<host>/ws`),
   JSON hello mẫu (`audio_params.format=opus`), quy trình gửi audio Opus raw, bảng
@@ -14,6 +20,9 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Changed
+- Whisper: `vad_filter`, `condition_on_previous_text=false`, `no_speech_threshold=0.6`
+  để giảm ảo giác khi im lặng/nhiễu.
+- `pause` thật sự giữ idle (bỏ audio) đến `audio_start`.
 - **VAD chống pop mic**: bỏ ~900ms audio sau khi arm listen (`WARMUP_MS`);
   cần ~6 frame RMS cao liên tiếp (`HOT_FRAMES`) mới coi là bắt đầu nói.
   Ngưỡng `VOICE_ENERGY` giữ 200.
@@ -29,6 +38,8 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
 
 ### Fixed
+- Chặn ảo giác Whisper kiểu outro YouTube (“Hãy subscribe cho kênh Ghiền Mì Gõ…”)
+  — coi như chưa nói, không gửi STT/agent.
 - `pcmChunkEnergy` đọc `Int16Array` trực tiếp từ Buffer (tránh copy `ArrayBuffer`
   lệch offset, RMS = 0 → không bao giờ vào `voiceStarted`).
 - Log decode/frame rỗng để debug packet Opus không ra PCM.
