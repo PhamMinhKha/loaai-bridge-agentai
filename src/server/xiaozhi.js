@@ -4,9 +4,11 @@ import { mergePrefs, resolveAgent, resolveTts } from "../runtime/options.js";
 import { playTtsXiaozhi } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 
-const VOICE_ENERGY = 80;
+const VOICE_ENERGY = 200;
 const SILENCE_MS = 1200;
 const LISTEN_MS = 30000;
+const WARMUP_MS = 900;
+const HOT_FRAMES = 6; // ~360ms tiếng thật, tránh pop lúc mở mic
 
 function pcmChunkEnergy(buf) {
     try {
@@ -23,6 +25,8 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
     let session = null;
     let silenceTimer = null, listenTimer = null;
     let voiceStarted = false;
+    let listenArmedAt = Date.now();
+    let hotFrames = 0;
     let codec = (initialFormat === "pcm") ? "pcm" : "opus";
     let prefs = { ...initialPrefs };
     const opusDec = new OpusDecodeStream();
@@ -132,16 +136,24 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                     }
                     return;
                 }
+                if (Date.now() - listenArmedAt < WARMUP_MS) {
+                    return;
+                }
                 stt.push(pcm);
                 const energy = pcmChunkEnergy(pcm);
                 if (rxFrames <= 3 || rxFrames % 50 === 0) {
                     console.log("[xiaozhi] audio frame", rxFrames, "opus", buf.length, "pcm", pcm.length, "rms", Math.round(energy));
                 }
-                if (!voiceStarted && energy > VOICE_ENERGY) {
+                if (energy > VOICE_ENERGY) {
+                    hotFrames++;
+                } else {
+                    hotFrames = 0;
+                }
+                if (!voiceStarted && hotFrames >= HOT_FRAMES) {
                     voiceStarted = true;
                     clearListen();
                     send({ type: "state", state: "listening" });
-                    console.log("[xiaozhi] voice started rms", Math.round(energy));
+                    console.log("[xiaozhi] voice started rms", Math.round(energy), "hot", hotFrames);
                 }
                 if (voiceStarted && energy > VOICE_ENERGY) armSilence();
                 return;
@@ -166,11 +178,26 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 await handleTextCommand(message.text);
             } else if (message.type === "audio_start") {
                 voiceStarted = false;
+                hotFrames = 0;
+                rxFrames = 0;
+                listenArmedAt = Date.now();
                 if (stt && stt.reset) stt.reset();
                 clearSilence();
                 send({ type: "state", state: "listening" });
                 armListen();
+            } else if (message.type === "pause") {
+                voiceStarted = false;
+                hotFrames = 0;
+                clearSilence();
+                clearListen();
+                if (stt && stt.reset) stt.reset();
+                send({ type: "state", state: "idle" });
+                console.log("[xiaozhi] paused — stay idle until audio_start");
             } else if (message.type === "audio_end") {
+                if (!voiceStarted) {
+                    console.log("[xiaozhi] ignore audio_end before voice");
+                    return;
+                }
                 await finalizeAudio(true);
             }
         } catch (e) {

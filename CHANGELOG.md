@@ -14,12 +14,16 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Changed
+- **VAD chống pop mic**: bỏ ~900ms audio sau khi arm listen (`WARMUP_MS`);
+  cần ~6 frame RMS cao liên tiếp (`HOT_FRAMES`) mới coi là bắt đầu nói.
+  Ngưỡng `VOICE_ENERGY` giữ 200.
+- Message `pause` → `idle` (reset STT/VAD), chờ `audio_start` mới nghe lại.
+- Bỏ `audio_end` nếu chưa có tiếng (`voiceStarted`), tránh cắt phiên ảo.
 - **Decode Opus ưu tiên native `@discordjs/opus`**, fallback `opusscript` nếu native lỗi;
   chuẩn hoá PCM về Buffer s16le (`src/audio/opusCodec.js`).
-- **Ngưỡng VAD thấp hơn** (`VOICE_ENERGY` 200 → 80) để bắt giọng nhỏ hơn trên ESP32.
 - **Giữ `listening`** khi hết `LISTEN_MS`, STT trống, STT lỗi, hoặc vừa hello;
   timeout chỉ reset STT rồi arm lại vòng nghe (không đẩy `idle`).
-- Xử lý `audio_start`: reset STT/VAD và quay lại `listening`.
+- Xử lý `audio_start`: reset STT/VAD, warmup và quay lại `listening`.
 - Flow Text (tab 2) quay về `listening` sau khi trả lời xong, giữ vòng hội thoại.
 - Cập nhật agents (`hermes.js`, `openclaw.js`), `audioManager.js`, `config.js`,
   `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
