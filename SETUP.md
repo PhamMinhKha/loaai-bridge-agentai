@@ -99,6 +99,24 @@ Chạy nền Windows đơn giản: `start_vg.bat` (cùng thư mục repo).
 
 ---
 
+## 3b. App desktop (Tauri)
+
+Yêu cầu thêm: **Rust** (`rustc`, `cargo`) và **Node** trên PATH.
+
+```bash
+npm run setup:dev    # lần đầu
+npm run tauri:dev    # dev: spawn gateway + cửa sổ app + tray
+npm run tauri:build  # đóng gói .dmg (macOS) / .exe (Windows)
+```
+
+- Đóng cửa sổ → ẩn vào tray (Windows) / menu bar (macOS); gateway vẫn chạy nền.
+- Tray / menu bar → **Mở Voice Gateway** / bật **Khởi động cùng Windows** hoặc **Launch at login** / **Thoát**.
+- Tab **Cài đặt** (app desktop): toggle autostart, đổi port, WSS LAN.
+- UI in-app: tab **Setup & Kiểm tra** (Tự setup, Hermes, diagnostics), chọn STT Whisper/OpenAI, test mic tab Flow 1.
+- Build production cần Node cài trên máy người dùng (bundle Node sidecar: P2).
+
+---
+
 ## 4. Cấu hình `.env`
 
 File mẫu: [`.env.example`](./.env.example). Không commit `.env`.
@@ -106,6 +124,9 @@ File mẫu: [`.env.example`](./.env.example). Không commit `.env`.
 | Biến | Mặc định | Ý nghĩa |
 |------|----------|---------|
 | `PORT` | `3000` | HTTP + WebSocket |
+| `TLS_ENABLED` | `false` | Bật HTTPS/WSS cho LAN (ESP32). Localhost vẫn `http`/`ws` |
+| `TLS_CERT_PATH` | `data/tls/gateway.crt` | Cert PEM (tự sinh nếu trống) |
+| `TLS_KEY_PATH` | `data/tls/gateway.key` | Private key PEM |
 | `STT_PROVIDER` | `whisper` | `none` \| `whisper` |
 | `WHISPER_MODEL` | `medium` | Model faster-whisper |
 | `WHISPER_PYTHON` | `.venv` sau setup | Interpreter STT |
@@ -121,6 +142,17 @@ File mẫu: [`.env.example`](./.env.example). Không commit `.env`.
 | `SILENCE_MS` | `1200` | Im lặng → chốt câu |
 
 OpenClaw: bật `gateway.http.endpoints.chatCompletions`. Hermes: `API_SERVER_ENABLED=true`.
+
+### WSS cho LAN (ESP32)
+
+Tab **Cài đặt** → bật **WSS cho LAN** → **Áp dụng & restart**.
+
+| Client | URL |
+|--------|-----|
+| Tauri / trình duyệt local | `http://127.0.0.1:PORT/` · `ws://127.0.0.1:PORT/ws` |
+| ESP32 / thiết bị LAN | `https://<IP-PC>:PORT/` · `wss://<IP-PC>:PORT/ws` |
+
+Cert self-signed được tạo tại `data/tls/` (SAN: localhost, 127.0.0.1, IP LAN). ESP32 **không cần embed firmware**: lần đầu kết nối WSS (insecure), gateway tự gửi `tls_cert` trong hello — lưu NVS rồi verify các lần sau. Hoặc copy cert từ tab Cài đặt / `GET /api/tls/cert`.
 
 ---
 

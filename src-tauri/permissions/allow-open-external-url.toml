@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-open-external-url"
+description = "Allow opening external URLs from the UI"
+commands.allow = ["open_external_url"]

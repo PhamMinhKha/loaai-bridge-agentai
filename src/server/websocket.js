@@ -10,6 +10,8 @@ import { saveSttDump } from "../runtime/sttDump.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
 import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
+import { getStt } from "../runtime/sttRuntime.js";
+import { getTlsProvisionPayload } from "../runtime/tlsSetup.js";
 
 const VOICE_ENERGY = 200;
 const PARTIAL_ENABLED = (process.env.PARTIAL_ENABLED || "false").toLowerCase() === "true";
@@ -25,7 +27,7 @@ function pcmChunkEnergy(buf) {
     }
 }
 
-export function createWebSocketServer(server, stt, opts = {}) {
+export function createWebSocketServer(server, opts = {}) {
     const wss = new WebSocketServer({ server, path: "/ws" });
 
     const SILENCE_MS = Number(opts.silenceMs || process.env.SILENCE_MS || 1200);
@@ -69,7 +71,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
                 if (!voiceStarted) {
                     send(msg.state("idle"));
                     setState(deviceId, "idle");
-                    stt.reset();
+                    getStt().reset();
                 }
             }, LISTEN_MS);
         };
@@ -82,6 +84,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
             send(msg.state("processing"));
             const t0 = Date.now();
             try {
+                const stt = getStt();
                 const transcript = await stt.flush();
                 const sttMs = Date.now() - t0;
                 const raw = transcript == null ? "" : String(transcript);
@@ -136,7 +139,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
                 clearSilence();
                 clearListen();
                 voiceStarted = false;
-                if (stt && stt.reset) stt.reset();
+                if (getStt().reset) getStt().reset();
                 console.log("[ws] goodbye", JSON.stringify(text));
                 setTimeout(() => {
                     try { if (socket.readyState === socket.OPEN) socket.close(); } catch { /* ignore */ }
@@ -181,7 +184,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
         socket.on("message", async (data, isBinary) => {
             try {
                 if (isBinary) {
-                    stt.push(data);
+                    getStt().push(data);
                     const energy = pcmChunkEnergy(data);
                     if (energy > 0) console.log("[vad] energy", energy.toFixed(0), "voiceStarted", voiceStarted);
                     if (!voiceStarted && energy > VOICE_ENERGY) {
@@ -193,7 +196,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
                         if (PARTIAL_ENABLED && !partialTimer) {
                             partialTimer = setInterval(async () => {
                                 try {
-                                    const pt = await stt.partial();
+                                    const pt = await getStt().partial();
                                     if (pt) send(msg.transcriptPartial(pt));
                                 } catch (e) { console.error("[partial]", e.message); }
                             }, 1500);
@@ -211,12 +214,12 @@ export function createWebSocketServer(server, stt, opts = {}) {
                             const fmt = message.audio_params.format;
                             socket.removeAllListeners("message");
                             socket.removeAllListeners("close");
-                            handleXiaozhi(socket, stt, fmt, prefs, { deviceId: message.device_id });
+                            handleXiaozhi(socket, fmt, prefs, { deviceId: message.device_id });
                             return;
                         }
                         deviceId = message.device_id;
                         session = getOrCreateSession(deviceId);
-                        send(msg.helloAck(deviceId, session.sessionId));
+                        send(msg.helloAck(deviceId, session.sessionId, getTlsProvisionPayload() || {}));
                         send({ type: "config_ok", ...prefs });
                         break;
 
@@ -238,7 +241,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
                         break;
 
                     case "audio_start":
-                        stt.reset();
+                        getStt().reset();
                         voiceStarted = false;
                         clearSilence();
                         send(msg.state("listening"));
@@ -251,7 +254,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
 
                     case "interrupt":
                         clearSilence(); clearListen();
-                        stt.reset();
+                        getStt().reset();
                         voiceStarted = false;
                         setState(deviceId, "listening");
                         send(msg.state("listening"));
@@ -269,7 +272,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
 
         socket.on("close", () => {
             clearSilence(); clearListen();
-            if (stt && stt.reset) stt.reset();
+            if (getStt().reset) getStt().reset();
             console.log("Device disconnected:", deviceId);
         });
     });

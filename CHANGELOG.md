@@ -5,6 +5,21 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 ## [Unreleased] — 2026-08-14
 
 ### Added
+- **Ứng dụng desktop Tauri 2** (`src-tauri/`, `npm run tauri:dev` / `tauri:build`): chạy gateway Node
+  bundled, tray icon, đóng cửa sổ → ẩn vào tray, title bar `Voice Gateway v… - LoaAi.me`.
+- **Icon app** tùy chỉnh (microphone + gateway, bo góc Dock macOS) — nguồn `scripts/app-icon.svg`,
+  sinh `icon.icns` / `icon.ico` / favicon.
+- Tab **ℹ️ Thông tin**: nguồn gốc Loa Ai, vai trò cầu nối OpenClaw/Hermes, nút mở [LoaAi.me](https://loaai.me).
+- Tab **⚙ Cài đặt**: theme sáng/tối, đổi port TCP (1024–65535), **WSS/TLS LAN** cho ESP32,
+  toggle **khởi động cùng hệ thống** (desktop + menu tray).
+- API mới: `GET /health` (version), `GET /api/server`, `POST /api/server/restart`,
+  `GET /api/tls/info`, `GET /api/tls/cert`.
+- TLS/WSS tự ký cho LAN (`src/runtime/tlsSetup.js`, `selfsigned`); localhost vẫn HTTP/WS.
+- Setup tự động **OpenClaw** (`POST /api/setup/openclaw`, `openclawSetup.js`).
+- STT **OpenAI Whisper API** (`STT_PROVIDER=openai`, `src/audio/openaiStt.js`, `sttRuntime.js`).
+- Tab **⚡ Thiết lập**: dev setup, Hermes/OpenClaw one-click, diagnostics (`/api/diagnostics`).
+- Runtime mới: `envFile.js`, `serverControl.js`, `devSetup.js`, `diagnostics.js`.
+- Lệnh Tauri `open_external_url` + quyền shell mở link ngoài trình duyệt hệ thống.
 - **Chụp màn hình PC** gửi qua WebSocket: client `{ "type": "screenshot" }` hoặc nói
   “chụp màn hình”; server trả JPEG base64 (`type: screenshot`). Nút trên web UI.
   JPEG tối đa **360×auto** (nặng nhẹ cho màn ESP32). Không gửi JPEG binary.
@@ -20,6 +35,10 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Changed
+- **Web UI** tái cấu trúc đa tab: Giọng nói, Chat, Cấu hình, Thiết lập, ESP32, Thông tin, Cài đặt;
+  header giao diện chỉ hiển thị **Voice Gateway** (phiên bản ở tab Thông tin).
+- Cài đặt port: badge **TCP** trên, **Port** và ô nhập cùng hàng, dải `1024 – 65535` bên dưới.
+- Chụp màn hình: hỗ trợ Windows PowerShell tốt hơn (`scripts/screenshot.ps1`, `screenshot.js`).
 - Whisper: `vad_filter`, `condition_on_previous_text=false`, `no_speech_threshold=0.6`
   để giảm ảo giác khi im lặng/nhiễu.
 - `pause` thật sự giữ idle (bỏ audio) đến `audio_start`.
@@ -38,6 +57,7 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
 
 ### Fixed
+- Nút/link **Mở LoaAi.me**: chữ trắng trên nền xanh, mở URL qua Tauri shell thay vì bị chặn webview.
 - Chặn ảo giác Whisper kiểu outro YouTube (“Hãy subscribe cho kênh Ghiền Mì Gõ…”)
   — coi như chưa nói, không gửi STT/agent.
 - `pcmChunkEnergy` đọc `Int16Array` trực tiếp từ Buffer (tránh copy `ArrayBuffer`

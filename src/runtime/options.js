@@ -1,7 +1,9 @@
 import { config } from "../config/config.js";
 import { createAgent } from "../agents/factory.js";
-import { createTts, normalizeTtsProvider } from "../audio/audioManager.js";
+import { createTts, normalizeTtsProvider, normalizeSttProvider } from "../audio/audioManager.js";
 import { probeOpenAi } from "../agents/openaiChat.js";
+import { upsertEnvFile, VG_ENV } from "./envFile.js";
+import { reconfigureStt, getSttPrefs as runtimeSttPrefs } from "./sttRuntime.js";
 
 export const EDGE_VOICES = [
     { id: "vi-VN-HoaiMyNeural", label: "Tiếng Việt — Hoài My (nữ)" },
@@ -15,6 +17,20 @@ export const GOOGLE_VOICES = [
     { id: "en", label: "English (gTTS)" }
 ];
 
+export const WHISPER_MODELS = [
+    { id: "tiny", label: "tiny — nhanh" },
+    { id: "base", label: "base" },
+    { id: "small", label: "small" },
+    { id: "medium", label: "medium (mặc định)" },
+    { id: "large-v3", label: "large-v3 — chính xác nhất" }
+];
+
+export const STT_PROVIDERS = [
+    { id: "none", label: "Tắt STT" },
+    { id: "whisper", label: "Whisper local (offline)" },
+    { id: "openai", label: "OpenAI Whisper API" }
+];
+
 function normalizeAgent(name) {
     const p = String(name || "mock").toLowerCase();
     if (p === "openclaw" || p === "hermes" || p === "mock") return p;
@@ -25,6 +41,9 @@ const state = {
     agentProvider: normalizeAgent(config.agentProvider),
     ttsProvider: normalizeTtsProvider(config.tts.provider),
     ttsVoice: config.tts.voice || "vi-VN-HoaiMyNeural",
+    sttProvider: normalizeSttProvider(config.stt.provider),
+    whisperModel: config.stt.model || "medium",
+    sttApiKey: config.stt.apiKey || "",
     openclaw: { ...config.openclaw },
     hermes: { ...config.hermes },
     telegramSync: String(process.env.TELEGRAM_SYNC || "true").toLowerCase() !== "false",
@@ -38,8 +57,14 @@ export function getPrefs() {
     return {
         agent: state.agentProvider,
         tts: state.ttsProvider,
-        voice: state.ttsVoice
+        voice: state.ttsVoice,
+        stt: state.sttProvider,
+        whisperModel: state.whisperModel
     };
+}
+
+export function getSttPrefs() {
+    return runtimeSttPrefs();
 }
 
 export function getTelegramPrefs() {
@@ -51,16 +76,32 @@ export function mergePrefs(base, patch = {}) {
     if (patch.agent) next.agent = normalizeAgent(patch.agent);
     if (patch.tts || patch.ttsProvider) next.tts = normalizeTtsProvider(patch.tts || patch.ttsProvider);
     if (patch.voice) next.voice = patch.voice;
+    if (patch.stt || patch.sttProvider) next.stt = normalizeSttProvider(patch.stt || patch.sttProvider);
+    if (patch.whisperModel) next.whisperModel = patch.whisperModel;
     return next;
 }
 
+function persistSttEnv() {
+    const entries = {
+        STT_PROVIDER: state.sttProvider,
+        WHISPER_MODEL: state.whisperModel
+    };
+    if (state.sttApiKey) entries.STT_API_KEY = state.sttApiKey;
+    upsertEnvFile(VG_ENV, entries);
+}
+
 export function applyGlobalOptions(patch = {}) {
-    const prev = { ...state };
+    const prev = { ...state, sttApiKey: state.sttApiKey };
     if (patch.agent) state.agentProvider = normalizeAgent(patch.agent);
     if (patch.tts || patch.ttsProvider) {
         state.ttsProvider = normalizeTtsProvider(patch.tts || patch.ttsProvider);
     }
     if (patch.voice) state.ttsVoice = patch.voice;
+    if (patch.stt || patch.sttProvider) {
+        state.sttProvider = normalizeSttProvider(patch.stt || patch.sttProvider);
+    }
+    if (patch.whisperModel) state.whisperModel = patch.whisperModel;
+    if (patch.sttApiKey) state.sttApiKey = String(patch.sttApiKey);
     if (patch.openclawUrl) state.openclaw.url = patch.openclawUrl;
     if (patch.openclawToken) state.openclaw.token = patch.openclawToken;
     if (patch.openclawModel) state.openclaw.model = patch.openclawModel;
@@ -69,6 +110,18 @@ export function applyGlobalOptions(patch = {}) {
     if (patch.hermesModel) state.hermes.model = patch.hermesModel;
     if (typeof patch.telegramSync === "boolean") state.telegramSync = patch.telegramSync;
     if (patch.telegramTo) state.telegramTo = String(patch.telegramTo);
+
+    const sttChanged = state.sttProvider !== prev.sttProvider ||
+        state.whisperModel !== prev.whisperModel ||
+        state.sttApiKey !== prev.sttApiKey;
+    if (sttChanged) {
+        persistSttEnv();
+        reconfigureStt({
+            provider: state.sttProvider,
+            model: state.whisperModel,
+            apiKey: state.sttApiKey
+        });
+    }
 
     if (state.agentProvider !== prev.agentProvider ||
         state.openclaw.url !== prev.openclaw.url ||
@@ -124,7 +177,10 @@ export async function publicOptions() {
         probeOpenAi(state.hermes.url || "http://127.0.0.1:8642", state.hermes.token)
     ]);
     return {
-        current: getPrefs(),
+        current: {
+            ...getPrefs(),
+            sttApiKeySet: Boolean(state.sttApiKey)
+        },
         agents: [
             { id: "mock", label: "Mock (echo local)", configured: true, reachable: true },
             {
@@ -154,7 +210,8 @@ export async function publicOptions() {
             pyttsx3: [{ id: "sapi", label: "Giọng hệ thống Windows" }],
             none: []
         },
-        stt: config.stt.provider,
+        stt: STT_PROVIDERS,
+        whisperModels: WHISPER_MODELS,
         telegram: getTelegramPrefs()
     };
 }

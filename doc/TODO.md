@@ -100,12 +100,26 @@ Cập nhật sau khi làm P0 trong code. Mục **Test thật** (máy có Edge/Op
 
 Chuyển Voice Gateway từ Node server + trình duyệt thành **app desktop**, chạy nền; khi người dùng đóng cửa sổ thì **không thoát**, chỉ thu vào **khay hệ thống** (Windows: system tray / notification area; macOS: menu bar).
 
-- [ ] Chọn stack cross-platform (Electron hoặc Tauri) bọc `src/index.js` + UI `public/`
-- [ ] Đóng cửa sổ = ẩn, process gateway vẫn listen (HTTP/WS port)
-- [ ] Icon khay / menu bar: mở lại cửa sổ, trạng thái (idle / listening / thinking), Quit thật sự
-- [ ] Windows: tray + Start with Windows (tùy chọn)
-- [ ] macOS: menu bar extra + Launch at login (tùy chọn); notarize/signing sau
-- [ ] Build / đóng gói: `.exe` (Windows) và `.dmg` / `.app` (macOS) từ cùng codebase
-- [ ] Cài đặt lần đầu: `.env`, Python/Whisper, Hermes URL — wizard hoặc giữ file cấu hình user
-- [ ] Không phụ thuộc mở trình duyệt thủ công; UI in-app
+- [x] Chọn stack **Tauri** bọc `src/index.js` + UI `public/`
+- [x] Đóng cửa sổ = ẩn, process gateway vẫn listen (HTTP/WS port)
+- [x] Icon khay / menu bar: mở lại cửa sổ, trạng thái gateway, Quit thật sự
+- [x] Windows: tray + Start with Windows (tùy chọn)
+- [x] macOS: menu bar extra + Launch at login (tùy chọn); notarize/signing sau
+- [x] Build script: `npm run tauri:build` → `.dmg` / `.app` (macOS), `.exe` (Windows)
+- [x] Cài đặt lần đầu: tab Setup — Tự setup, Hermes API, Kiểm tra lỗi; STT local/OpenAI
+- [x] Không phụ thuộc mở trình duyệt thủ công; UI in-app (`?app=1`)
+
+### STT runtime (web + app)
+
+- [x] Chọn STT: `none` | `whisper` (local, chọn model) | `openai` (API key)
+- [x] Hot-swap STT runtime qua `POST /api/options`
+- [x] `GET /api/diagnostics` + `POST /api/setup/dev`
+
+### WSS LAN (P1)
+
+- [x] `TLS_ENABLED` — HTTPS/WSS cho LAN, HTTP/WS localhost giữ nguyên
+- [x] Tab Cài đặt: toggle WSS, preview URL local/LAN
+- [x] Cert self-signed tự sinh `data/tls/`
+- [x] Tự truyền cert qua hello WSS (`tls_cert`, `tls_cert_sha256`) + API `/api/tls/cert`
+- [ ] ESP32 firmware: lưu cert từ hello vào NVS + test WSS thật trên board
 

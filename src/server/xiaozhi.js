@@ -8,6 +8,8 @@ import { saveSttDump } from "../runtime/sttDump.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
 import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
+import { getStt } from "../runtime/sttRuntime.js";
+import { getTlsProvisionPayload } from "../runtime/tlsSetup.js";
 
 const VOICE_ENERGY = 200;
 const SILENCE_MS = 1200;
@@ -25,7 +27,7 @@ function pcmChunkEnergy(buf) {
     } catch { return 0; }
 }
 
-export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = {}) {
+export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
     let deviceId = null;
     let session = null;
     let silenceTimer = null, listenTimer = null;
@@ -46,7 +48,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         clearListen();
         listenTimer = setTimeout(() => {
             if (!voiceStarted) {
-                stt.reset();
+                getStt().reset();
                 send({ type: "state", state: "listening" });
                 armListen();
             }
@@ -59,7 +61,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         hotFrames = 0;
         clearSilence();
         clearListen();
-        if (stt && stt.reset) stt.reset();
+        if (getStt().reset) getStt().reset();
         send({ type: "state", state: "idle" });
         console.log("[xiaozhi] idle", reason || "");
     };
@@ -72,6 +74,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         send({ type: "state", state: "processing" });
         const t0 = Date.now();
         try {
+            const stt = getStt();
             const transcript = await stt.flush();
             const sttMs = Date.now() - t0;
             const raw = transcript == null ? "" : String(transcript);
@@ -168,7 +171,8 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         type: "hello",
         session_id: session.sessionId,
         transport: "websocket",
-        audio_params: { sample_rate: 16000, frame_duration: OPUS_FRAME_MS }
+        audio_params: { sample_rate: 16000, frame_duration: OPUS_FRAME_MS },
+        ...(getTlsProvisionPayload() || {})
     });
     send({ type: "config_ok", ...prefs });
     send({ type: "state", state: "listening" });
@@ -192,7 +196,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 if (Date.now() - listenArmedAt < WARMUP_MS) {
                     return;
                 }
-                stt.push(pcm);
+                getStt().push(pcm);
                 const energy = pcmChunkEnergy(pcm);
                 if (rxFrames <= 3 || rxFrames % 50 === 0) {
                     console.log("[xiaozhi] audio frame", rxFrames, "opus", buf.length, "pcm", pcm.length, "rms", Math.round(energy));
@@ -242,7 +246,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 hotFrames = 0;
                 rxFrames = 0;
                 listenArmedAt = Date.now();
-                if (stt && stt.reset) stt.reset();
+                if (getStt().reset) getStt().reset();
                 clearSilence();
                 send({ type: "state", state: "listening" });
                 armListen();
@@ -262,7 +266,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
 
     socket.on("close", () => {
         clearSilence(); clearListen();
-        if (stt && stt.reset) stt.reset();
+        if (getStt().reset) getStt().reset();
         console.log("xiaozhi device disconnected:", deviceId);
     });
 }

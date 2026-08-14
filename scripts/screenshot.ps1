@@ -15,9 +15,16 @@ $g.Dispose()
 
 $srcW = $src.Width
 $srcH = $src.Height
+$nw = $srcW
+$nh = $srcH
 if ($MaxWidth -gt 0 -and $srcW -gt $MaxWidth) {
     $nw = $MaxWidth
     $nh = [int][Math]::Round($srcH * ($MaxWidth / [double]$srcW))
+}
+# ESP32 JPEG decoder (4:2:0 MCU) cần cạnh chia hết 16.
+$nw = [Math]::Max(80, [int]([Math]::Floor($nw / 16.0) * 16))
+$nh = [Math]::Max(80, [int]([Math]::Floor($nh / 16.0) * 16))
+if ($nw -ne $src.Width -or $nh -ne $src.Height) {
     $dst = New-Object System.Drawing.Bitmap $nw, $nh
     $g2 = [System.Drawing.Graphics]::FromImage($dst)
     $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic

@@ -67,7 +67,7 @@ export async function probeOpenAi(baseUrl, token, timeoutMs = 1200) {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             signal: ac.signal
         });
-        return res.ok || res.status === 401;
+        return res.ok || res.status === 401 || res.status === 403;
     } catch {
         return false;
     } finally {

@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Main window capabilities","local":true,"windows":["main"],"permissions":["core:default","shell:allow-open","allow-open-external-url"]},"desktop-capability":{"identifier":"desktop-capability","description":"","local":true,"windows":["main"],"permissions":["autostart:default"],"platforms":["macOS","windows","linux"]}}

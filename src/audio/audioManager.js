@@ -3,12 +3,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { transcribeOpenAi } from "./openaiStt.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, "..", "..", "scripts", "whisper_stt.py");
 
+export function normalizeSttProvider(name) {
+    const p = String(name || "none").toLowerCase();
+    if (p === "whisper" || p === "openai") return p;
+    return "none";
+}
+
 // Write PCM16 mono buffers into a WAV file, return path.
-function writeWav(pcmBuffers, sampleRate = 16000) {
+export function writeWav(pcmBuffers, sampleRate = 16000) {
     const pcm = Buffer.concat(pcmBuffers);
     const wav = Buffer.alloc(44 + pcm.length);
     // RIFF header
@@ -73,13 +80,40 @@ export class STTManager {
 // partial("P") and a flush("F") issued close together don't clobber each other.
 export class StreamingSTT {
     constructor(cfg = {}) {
-        this.provider = cfg.provider || "none";
+        this.provider = normalizeSttProvider(cfg.provider);
         this.model = cfg.model || "medium";
         this.python = cfg.python || "python";
+        this.apiKey = cfg.apiKey || "";
         this.proc = null;
         this._buf = Buffer.alloc(0);
         this._queue = [];          // FIFO of { resolve, timer }
         this._stdoutBuf = "";      // partial stdout accumulator
+        this.lastPcm = Buffer.alloc(0);
+    }
+
+    reconfigure(cfg = {}) {
+        const nextProvider = normalizeSttProvider(cfg.provider ?? this.provider);
+        const nextModel = cfg.model ?? this.model;
+        const nextKey = cfg.apiKey !== undefined ? cfg.apiKey : this.apiKey;
+        const changed = nextProvider !== this.provider ||
+            nextModel !== this.model ||
+            nextKey !== this.apiKey;
+        this.provider = nextProvider;
+        this.model = nextModel;
+        if (cfg.python) this.python = cfg.python;
+        if (cfg.apiKey !== undefined) this.apiKey = cfg.apiKey;
+        if (this.proc) {
+            try { this.proc.kill(); } catch {}
+            this.proc = null;
+        }
+        while (this._queue.length) {
+            const q = this._queue.shift();
+            clearTimeout(q.timer);
+            q.resolve(null);
+        }
+        this._buf = Buffer.alloc(0);
+        this.lastPcm = Buffer.alloc(0);
+        if (changed) console.log("[stt] reconfigured", this.provider, this.model);
     }
 
     _ensure() {
@@ -134,6 +168,7 @@ export class StreamingSTT {
 
     push(chunk) {
         this._buf = Buffer.concat([this._buf, chunk]);
+        if (this.provider !== "whisper") return;
         // stream chunk to worker right away (control 'C' needs no response)
         this._ensure();
         this.proc.stdin.write(Buffer.from([ord_c("C")]));
@@ -148,13 +183,25 @@ export class StreamingSTT {
     }
 
     async flush() {
-        if (this.provider !== "whisper") {
+        if (this.provider === "none") {
             this.lastPcm = Buffer.alloc(0);
+            this._buf = Buffer.alloc(0);
             return "";
         }
         const pcm = this._buf;
         this.lastPcm = pcm;
         this._buf = Buffer.alloc(0);
+        if (!pcm.length) return "";
+
+        if (this.provider === "openai") {
+            const wav = writeWav([pcm]);
+            try {
+                return await transcribeOpenAi(wav, this.apiKey);
+            } finally {
+                try { fs.unlinkSync(wav); } catch {}
+            }
+        }
+
         const r = await this._request("F", null);
         return r ? (r.text || "") : "";
     }

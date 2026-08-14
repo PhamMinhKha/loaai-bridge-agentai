@@ -1,131 +1,548 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Voice Gateway — ESP32-S3 Test Bench</title>
+<title>Voice Gateway</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 820px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.3rem; }
-  button { font-size: .95rem; padding: .5rem 1rem; margin: .2rem .3rem .2rem 0; border: 0; border-radius: 8px; cursor: pointer; }
-  .tabbtn { background: #e2e8f0; color: #0f172a; }
-  .tabbtn.active { background: #2563eb; color: #fff; }
-  #start { background: #16a34a; color: #fff; } #stop { background: #64748b; color: #fff; }
-  #send { background: #2563eb; color: #fff; }
-  #state { display: inline-block; padding: .2rem .6rem; border-radius: 999px; background: #e2e8f0; font-weight: 600; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #94a3b8; }
-  .dot.listening { background: #22c55e; } .dot.processing { background: #f59e0b; }
-  .dot.thinking { background: #a855f7; } .dot.speaking { background: #ef4444; } .dot.idle { background: #94a3b8; }
-  .panel { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
-  .hidden { display: none; }
-  .log { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 1rem; height: 300px; overflow-y: auto; font-size: .85rem; white-space: pre-wrap; margin-top: .8rem; }
+  :root, [data-theme="dark"] {
+    --bg: #0b0f17;
+    --bg-elevated: #111827;
+    --bg-card: #151d2e;
+    --bg-input: #0f1520;
+    --border: #1e293b;
+    --border-strong: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-soft: rgba(59,130,246,.12);
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --purple: #8b5cf6;
+    --log-bg: #060a12;
+    --code-bg: #0a101c;
+    --shadow: 0 4px 24px rgba(0,0,0,.35);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --select-option-bg: #151d2e;
+    --select-option-text: #e2e8f0;
+    --select-option-hover: #1e293b;
+    --select-option-active: #2563eb;
+    color-scheme: dark;
+  }
+  [data-theme="light"] {
+    --bg: #f1f5f9;
+    --bg-elevated: #ffffff;
+    --bg-card: #ffffff;
+    --bg-input: #f8fafc;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-faint: #64748b;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: rgba(37,99,235,.08);
+    --log-bg: #0f172a;
+    --code-bg: #1e293b;
+    --shadow: 0 4px 20px rgba(15,23,42,.08);
+    --select-option-bg: #ffffff;
+    --select-option-text: #0f172a;
+    --select-option-hover: #f1f5f9;
+    --select-option-active: #2563eb;
+    color-scheme: light;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 960px;
+    margin: 0 auto;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 0 1rem 2rem;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 0 .8rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+  .brand-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: block; flex-shrink: 0; object-fit: cover;
+  }
+  .brand h1 { font-size: 1.05rem; font-weight: 700; margin: 0; letter-spacing: -.02em; }
+  .brand p { font-size: .75rem; color: var(--text-muted); margin: .1rem 0 0; }
+  .status-bar { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+  #state {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .3rem .7rem; border-radius: 999px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    font-size: .78rem; font-weight: 600;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
+  .dot.listening { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .dot.processing { background: var(--warning); }
+  .dot.thinking { background: var(--purple); }
+  .dot.speaking { background: var(--danger); }
+  .dot.idle { background: var(--text-faint); }
+  #cfgSummary { font-size: .72rem; color: var(--text-muted); max-width: 180px; text-align: right; display: none; }
+  @media (min-width: 640px) { #cfgSummary { display: block; } }
+
+  /* Navigation */
+  .nav {
+    display: flex; gap: .25rem; overflow-x: auto;
+    padding: .75rem 0; margin-bottom: .5rem;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .5rem .85rem; border: 1px solid transparent;
+    border-radius: var(--radius-sm); background: transparent;
+    color: var(--text-muted); font-size: .82rem; font-weight: 500;
+    cursor: pointer; white-space: nowrap; transition: all .15s;
+  }
+  .nav-btn:hover { color: var(--text); background: var(--accent-soft); }
+  .nav-btn.active {
+    color: var(--accent); background: var(--accent-soft);
+    border-color: rgba(59,130,246,.25); font-weight: 600;
+  }
+  .nav-btn.hidden { display: none; }
+
+  /* Panels */
+  .panel { display: none; animation: fadeIn .2s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 1rem; }
+  .card-title { font-size: .95rem; font-weight: 600; margin: 0 0 .35rem; }
+  .card-desc { font-size: .82rem; color: var(--text-muted); margin: 0 0 1rem; }
+
+  /* Forms */
+  .cfg { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1rem; }
+  .cfg label { display: block; font-size: .75rem; font-weight: 500; color: var(--text-muted); margin-bottom: .3rem; }
+  .cfg select, .cfg input[type=text], .cfg input[type=password], .cfg input[type=number], .port-field input[type=number], .text-row input {
+    width: 100%; padding: .55rem .7rem;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size: .88rem;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .cfg input[type=number],
+  .port-field input[type=number] {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    max-width: 10rem;
+  }
+  .cfg input[type=number]::-webkit-outer-spin-button,
+  .cfg input[type=number]::-webkit-inner-spin-button,
+  .port-field input[type=number]::-webkit-outer-spin-button,
+  .port-field input[type=number]::-webkit-inner-spin-button {
+    opacity: .65;
+    margin-left: .25rem;
+  }
+  .cfg input[readonly] {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    cursor: default;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: .82rem;
+  }
+  .cfg input[readonly]:focus {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+  .cfg select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    padding-right: 2.25rem;
+    background-color: var(--bg-input);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right .65rem center;
+    background-size: 1rem;
+  }
+  [data-theme="light"] .cfg select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .cfg select:hover:not(:disabled) { border-color: var(--border-strong); }
+  .cfg select:disabled { opacity: .55; cursor: not-allowed; }
+  .cfg select option,
+  .cfg select optgroup {
+    background-color: var(--select-option-bg);
+    color: var(--select-option-text);
+    font-size: .88rem;
+    padding: .35rem .5rem;
+  }
+  .cfg select optgroup { font-weight: 600; color: var(--text-muted); }
+  .cfg select option:checked,
+  .cfg select option:focus,
+  .cfg select option:hover {
+    background-color: var(--select-option-active);
+    color: #fff;
+  }
+  .cfg select option:disabled { color: var(--text-faint); }
+  .cfg select:focus, .cfg input:focus, .port-field input:focus, .text-row input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .cfg input[readonly]:focus { outline: none; }
+
+  /* Settings: port & server */
+  .port-settings {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-top: .5rem;
+  }
+  .port-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .35rem;
+  }
+  .port-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    width: 100%;
+  }
+  .port-field label.port-label {
+    margin: 0;
+    flex-shrink: 0;
+    font-size: .75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .port-badge {
+    display: inline-flex; align-items: center;
+    padding: .12rem .45rem; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: .65rem; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .port-range {
+    font-size: .72rem;
+    color: var(--text-faint);
+    font-weight: 400;
+    margin: -.1rem 0 .15rem;
+  }
+  .port-field input[type=number] { width: auto; flex: 0 0 7.5rem; max-width: 7.5rem; }
+  .port-actions { margin-top: 0; }
+  .cfg .full { grid-column: 1 / -1; }
+  .check-row { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--text-muted); cursor: pointer; }
+  .check-row input { accent-color: var(--accent); }
+
+  /* Buttons */
+  .btn-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+  button {
+    font-family: inherit; font-size: .85rem; font-weight: 500;
+    padding: .55rem 1rem; border-radius: var(--radius-sm); cursor: pointer;
+    border: 1px solid transparent; transition: all .15s;
+  }
+  button:disabled { opacity: .55; cursor: wait; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-success { background: #16a34a; color: #fff; }
+  .btn-success:hover:not(:disabled) { background: #15803d; }
+  .btn-secondary { background: var(--bg-input); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--border-strong); }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-teal { background: #0d9488; color: #fff; }
+  .btn-amber { background: #d97706; color: #fff; }
+  .btn-orange { background: #ea580c; color: #fff; }
+  .agent-actions { margin-top: .25rem; }
+
+  /* Log */
+  .log {
+    background: var(--log-bg); color: #cbd5e1; border-radius: var(--radius-sm);
+    padding: 1rem; height: 320px; overflow-y: auto;
+    font-size: .82rem; font-family: ui-monospace, Menlo, Consolas, monospace;
+    border: 1px solid var(--border); margin-top: .85rem;
+  }
   .you { color: #7dd3fc; } .you.partial { color: #64748b; font-style: italic; }
   .ai { color: #86efac; } .sys { color: #94a3b8; }
-  audio { width: 100%; margin-top: .5rem; }
-  input[type=text] { width: 70%; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
-  .note { font-size: .8rem; color: #475569; }
-  .tabbtn.esp { background: #fef3c7; color: #92400e; }
-  .tabbtn.esp.active { background: #d97706; color: #fff; }
-  .guide h2 { font-size: 1.05rem; margin: 1.2rem 0 .4rem; color: #0f172a; }
-  .guide h3 { font-size: .92rem; margin: 1rem 0 .3rem; color: #1e293b; }
-  .guide p, .guide li { font-size: .88rem; color: #334155; line-height: 1.5; }
-  .guide ul { margin: .3rem 0 .3rem 1.1rem; padding: 0; }
-  .codebox { position: relative; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: .8rem 2.4rem .8rem .9rem; margin: .4rem 0; overflow-x: auto; }
-  .codebox code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; white-space: pre; }
-  .copybtn { position: absolute; top: .4rem; right: .4rem; background: #334155; color: #e2e8f0; border: 0; border-radius: 6px; padding: .2rem .5rem; font-size: .72rem; cursor: pointer; }
-  .copybtn:hover { background: #475569; }
-  .urlrow { display: flex; align-items: center; gap: .5rem; margin: .4rem 0; }
-  .urlrow input { flex: 1; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-family: ui-monospace, monospace; font-size: .85rem; }
-  table.gw { border-collapse: collapse; width: 100%; margin: .4rem 0; font-size: .82rem; }
-  table.gw th, table.gw td { border: 1px solid #e2e8f0; padding: .4rem .5rem; text-align: left; vertical-align: top; }
-  table.gw th { background: #f1f5f9; color: #0f172a; }
-  table.gw code { background: #f1f5f9; padding: .05rem .25rem; border-radius: 4px; font-size: .78rem; }
-  .cfg { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .8rem; align-items: end; }
-  .cfg label { display: block; font-size: .78rem; color: #475569; margin-bottom: .2rem; }
-  .cfg select, .cfg input { width: 100%; padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: .9rem; }
-  .cfg .full { grid-column: 1 / -1; }
-  #shotBtn { background: #0f766e; color: #fff; }
-  #shotPreview { max-width: 100%; border-radius: 8px; margin-top: .6rem; display: none; border: 1px solid #e2e8f0; }
-  #setupHermes { background: #7c3aed; color: #fff; }
-  #setupHermes:disabled { opacity: .6; cursor: wait; }
-  .reach { font-size: .75rem; color: #64748b; margin-top: .5rem; }
-  .reach.ok { color: #16a34a; } .reach.bad { color: #dc2626; }
-  @media (max-width: 640px) { .cfg { grid-template-columns: 1fr; } }
+
+  /* Text chat row */
+  .text-row { display: flex; gap: .5rem; align-items: center; }
+  .text-row input { flex: 1; }
+
+  audio { width: 100%; margin-top: .65rem; }
+
+  /* Hints */
+  .reach { font-size: .78rem; color: var(--text-muted); margin-top: .65rem; }
+  .reach.ok { color: var(--success); }
+  .reach.bad { color: var(--danger); }
+
+  /* Diagnostics */
+  .diag { list-style: none; padding: 0; margin: .75rem 0 0; }
+  .diag li { padding: .45rem .65rem; border-radius: var(--radius-sm); margin: .25rem 0; font-size: .82rem; }
+  .diag li.ok { background: rgba(34,197,94,.12); color: #4ade80; }
+  [data-theme="light"] .diag li.ok { color: #166534; background: #dcfce7; }
+  .diag li.warn { background: rgba(245,158,11,.12); color: #fbbf24; }
+  [data-theme="light"] .diag li.warn { color: #854d0e; background: #fef9c3; }
+  .diag li.fail { background: rgba(239,68,68,.12); color: #f87171; }
+  [data-theme="light"] .diag li.fail { color: #991b1b; background: #fee2e2; }
+
+  /* Guide / ESP32 */
+  .guide h2 { font-size: .95rem; font-weight: 600; margin: 1.25rem 0 .4rem; color: var(--text); }
+  .guide h2:first-child { margin-top: 0; }
+  .guide p, .guide li { font-size: .84rem; color: var(--text-muted); line-height: 1.55; }
+  .guide ol, .guide ul { margin: .4rem 0; padding-left: 1.25rem; }
+  .codebox {
+    position: relative; background: var(--code-bg); color: #e2e8f0;
+    border-radius: var(--radius-sm); padding: .85rem 2.6rem .85rem 1rem;
+    margin: .5rem 0; overflow-x: auto; border: 1px solid var(--border);
+  }
+  .codebox code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem; white-space: pre; }
+  .copybtn {
+    position: absolute; top: .4rem; right: .4rem;
+    background: rgba(255,255,255,.08); color: #cbd5e1; border: 0;
+    border-radius: 6px; padding: .25rem .55rem; font-size: .7rem; cursor: pointer;
+  }
+  .copybtn:hover { background: rgba(255,255,255,.15); }
+  .urlrow { display: flex; gap: .5rem; margin: .5rem 0; }
+  .urlrow input {
+    flex: 1; padding: .55rem .7rem; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-family: ui-monospace, monospace; font-size: .82rem; color: var(--text);
+  }
+  table.gw { border-collapse: collapse; width: 100%; margin: .5rem 0; font-size: .8rem; }
+  table.gw th, table.gw td { border: 1px solid var(--border); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+  table.gw th { background: var(--bg-input); color: var(--text); font-weight: 600; }
+  table.gw code { background: var(--bg-input); padding: .05rem .3rem; border-radius: 4px; font-size: .75rem; }
+
+  #shotPreview { max-width: 100%; border-radius: var(--radius-sm); margin-top: .75rem; display: none; border: 1px solid var(--border); }
+
+  /* Settings theme */
+  .theme-options { display: flex; gap: .75rem; margin-top: .5rem; }
+  .theme-card {
+    flex: 1; padding: 1rem; border-radius: var(--radius-sm);
+    border: 2px solid var(--border); cursor: pointer; text-align: center;
+    transition: all .15s; background: var(--bg-input);
+  }
+  .theme-card:hover { border-color: var(--border-strong); }
+  .theme-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .theme-preview {
+    width: 100%; height: 48px; border-radius: 6px; margin-bottom: .5rem;
+    border: 1px solid var(--border);
+  }
+  .theme-preview.dark { background: linear-gradient(135deg, #0b0f17, #1e293b); }
+  .theme-preview.light { background: linear-gradient(135deg, #f8fafc, #e2e8f0); }
+  .theme-card span { font-size: .82rem; font-weight: 500; color: var(--text); }
+  #themeLight {
+    background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+    border-color: #cbd5e1;
+  }
+  #themeLight:hover { border-color: #94a3b8; }
+  #themeLight.selected { border-color: var(--accent); background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%); }
+  #themeLight span { color: #0f172a; }
+
+  .hidden { display: none !important; }
+
+  .info-list { margin: .5rem 0 0; padding-left: 1.1rem; color: var(--text-muted); font-size: .88rem; line-height: 1.55; }
+  .info-list li { margin: .35rem 0; }
+  .info-list strong { color: var(--text); font-weight: 600; }
+  .ext-link {
+    color: #60a5fa;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .ext-link:hover { color: #93c5fd; }
+  a.btn-link {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .55rem 1rem; border-radius: var(--radius-sm);
+    background: var(--accent); color: #fff !important;
+    font-family: inherit; font-size: .85rem; font-weight: 500;
+    text-decoration: none; border: 1px solid transparent;
+    cursor: pointer; transition: background .15s;
+  }
+  a.btn-link:hover { background: var(--accent-hover); }
+  .info-badge {
+    display: inline-block; padding: .2rem .55rem; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-size: .72rem; font-weight: 700;
+    letter-spacing: .02em; margin-bottom: .5rem;
+  }
+
+  @media (max-width: 640px) {
+    .cfg { grid-template-columns: 1fr; }
+    .port-settings { align-items: stretch; }
+    .port-actions { margin-top: .25rem; }
+    .cfg input[type=number] { max-width: none; }
+    .header { flex-wrap: wrap; }
+    .theme-options { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
-<h1>🤖 Voice Gateway — ESP32-S3 Test Bench</h1>
-<p>Trạng thái: <span id="state"><span class="dot idle"></span>idle</span>
-  · <span id="cfgSummary" class="note">agent=… tts=…</span></p>
+<div class="app">
 
-<div class="panel" id="panelCfg">
-  <p class="note">Chọn Agent và TTS cho phiên web (áp dụng ngay, không cần restart server). Nút <b>Setup Hermes API</b> tự bật <code>API_SERVER</code> trên Hermes (cổng 8642), ghi token vào <code>.env</code>, rồi chọn agent Hermes.</p>
-  <div class="cfg">
-    <div>
-      <label for="selAgent">Agent</label>
-      <select id="selAgent"></select>
+  <header class="header">
+    <div class="brand">
+      <img class="brand-icon" src="/favicon.png" alt="Voice Gateway" width="40" height="40" />
+      <div>
+        <h1 id="pageTitle">Voice Gateway</h1>
+        <p id="pageSubtitle">Speech · Agent · TTS</p>
+      </div>
     </div>
-    <div>
-      <label for="selTts">TTS</label>
-      <select id="selTts"></select>
+    <div class="status-bar">
+      <span id="cfgSummary">…</span>
+      <span id="state"><span class="dot idle"></span>idle</span>
     </div>
-    <div id="voiceWrap">
-      <label for="selVoice">Giọng</label>
-      <select id="selVoice"></select>
+  </header>
+
+  <nav class="nav" role="tablist">
+    <button class="nav-btn active" id="tabVoice" role="tab">🎙 Giọng nói</button>
+    <button class="nav-btn" id="tabChat" role="tab">💬 Chat</button>
+    <button class="nav-btn" id="tabConfig" role="tab">🔧 Cấu hình</button>
+    <button class="nav-btn" id="tabSetup" role="tab">⚡ Thiết lập</button>
+    <button class="nav-btn" id="tabEsp" role="tab">📡 ESP32</button>
+    <button class="nav-btn" id="tabInfo" role="tab">ℹ️ Thông tin</button>
+    <button class="nav-btn" id="tabSettings" role="tab">⚙ Cài đặt</button>
+  </nav>
+
+  <!-- TAB: Giọng nói -->
+  <section class="panel active" id="panelVoice" role="tabpanel">
+    <div class="card">
+      <h2 class="card-title">Test Speech-to-Text</h2>
+      <p class="card-desc">Mic → STT (<span id="sttHint">…</span>) → Agent → TTS. PCM 16 kHz mono.</p>
+      <div class="btn-row">
+        <button class="btn-success" id="start">▶ Bắt đầu ghi âm</button>
+        <button class="btn-secondary" id="stop">■ Dừng</button>
+        <button class="btn-teal" id="shotBtn">🖼 Chụp màn hình</button>
+      </div>
+      <div class="log" id="logA"></div>
+      <img id="shotPreview" alt="screenshot" />
+      <audio id="playerA" controls hidden></audio>
     </div>
-    <div class="full">
-      <label>&nbsp;</label>
-      <button id="applyCfg">Áp dụng</button>
-      <button id="setupHermes">⚡ Setup Hermes API</button>
+  </section>
+
+  <!-- TAB: Chat -->
+  <section class="panel" id="panelChat" role="tabpanel">
+    <div class="card">
+      <h2 class="card-title">Chat văn bản</h2>
+      <p class="card-desc">Gõ lệnh → Agent → TTS, không cần mic.</p>
+      <div class="text-row">
+        <input type="text" id="textInput" placeholder="Ví dụ: mở đèn phòng khách" />
+        <button class="btn-primary" id="send">Gửi</button>
+      </div>
+      <div class="log" id="logT"></div>
+      <audio id="playerT" controls hidden></audio>
     </div>
-    <label class="full" style="display:flex;align-items:center;gap:.45rem;margin:0">
-      <input type="checkbox" id="chkTelegram" checked />
-      Đồng bộ hội thoại lên Telegram (Hermes)
-    </label>
-  </div>
-  <p class="reach" id="reachHint"></p>
-</div>
+  </section>
 
-<button class="tabbtn active" id="tabAudio">🎙️ Flow 1: Audio (Mic → STT → Agent → TTS)</button>
-<button class="tabbtn" id="tabText">💬 Flow 2: Text (Gõ → Agent → TTS)</button>
-<button class="tabbtn esp" id="tabEsp">📖 Cấu hình ESP32</button>
+  <!-- TAB: Cấu hình -->
+  <section class="panel" id="panelConfig" role="tabpanel">
+    <div class="card">
+      <h2 class="card-title">Agent &amp; STT &amp; TTS</h2>
+      <p class="card-desc">Áp dụng ngay, không cần restart gateway.</p>
+      <div class="cfg">
+        <div>
+          <label for="selAgent">Agent</label>
+          <select id="selAgent"></select>
+        </div>
+        <div class="full agent-actions" id="agentActions">
+          <button type="button" class="btn-orange hidden" id="setupOpenclaw">⚡ Kết nối OpenClaw</button>
+          <button type="button" class="btn-purple hidden" id="setupHermesCfg">⚡ Setup Hermes API</button>
+        </div>
+        <div>
+          <label for="selStt">STT</label>
+          <select id="selStt"></select>
+        </div>
+        <div id="whisperModelWrap">
+          <label for="selWhisperModel">Whisper model</label>
+          <select id="selWhisperModel"></select>
+        </div>
+        <div id="openaiKeyWrap" class="full hidden">
+          <label for="inpSttApiKey">OpenAI API key</label>
+          <input type="password" id="inpSttApiKey" placeholder="sk-…" autocomplete="off" />
+        </div>
+        <div>
+          <label for="selTts">TTS</label>
+          <select id="selTts"></select>
+        </div>
+        <div id="voiceWrap">
+          <label for="selVoice">Giọng</label>
+          <select id="selVoice"></select>
+        </div>
+        <div class="full">
+          <label class="check-row">
+            <input type="checkbox" id="chkTelegram" checked />
+            Đồng bộ hội thoại lên Telegram (Hermes)
+          </label>
+        </div>
+        <div class="full btn-row">
+          <button class="btn-primary" id="applyCfg">Áp dụng cấu hình</button>
+        </div>
+      </div>
+      <p class="reach" id="reachHint"></p>
+    </div>
+  </section>
 
-<!-- FLOW 1: AUDIO -->
-<div class="panel" id="panelAudio">
-  <p class="note">Mô phỏng ESP32-S3 gửi audio stream (mic). Server decode → Whisper → Agent → TTS → audio về.
-  Web dùng PCM để đơn giản; firmware thật gửi Opus (server hỗ trợ cả 2).</p>
-  <button id="start">▶ Bắt đầu ghi âm</button>
-  <button id="stop">■ Dừng</button>
-  <button id="shotBtn">🖼 Chụp màn hình PC</button>
-  <div class="log" id="logA"></div>
-  <img id="shotPreview" alt="screenshot" />
-  <audio id="playerA" controls hidden></audio>
-</div>
+  <!-- TAB: Thiết lập -->
+  <section class="panel guide" id="panelSetup" role="tabpanel">
+    <div class="card">
+      <h2 class="card-title">Thiết lập hệ thống</h2>
+      <p class="card-desc">Cài dependencies, kết nối OpenClaw/Hermes, và kiểm tra lỗi.</p>
+      <ol>
+        <li><b>Tự setup</b> — Node, Python, Whisper, TTS</li>
+        <li><b>Kết nối Agent</b> — OpenClaw hoặc Hermes (nút bên dưới)</li>
+        <li><b>Chọn Agent/STT</b> — tab Cấu hình</li>
+        <li><b>Test mic</b> — tab Giọng nói</li>
+      </ol>
+      <div class="btn-row">
+        <button class="btn-teal" id="setupDev">⚡ Tự setup</button>
+        <button class="btn-orange" id="setupOpenclawTab">⚡ Kết nối OpenClaw</button>
+        <button class="btn-purple" id="setupHermes">⚡ Setup Hermes API</button>
+        <button class="btn-amber" id="runDiag">🔍 Kiểm tra lỗi</button>
+      </div>
+      <p class="reach" id="setupHint"></p>
+      <ul class="diag" id="diagList"></ul>
+    </div>
+  </section>
 
-<!-- FLOW 2: TEXT -->
-<div class="panel hidden" id="panelText">
-  <p class="note">Mô phỏng ESP32-S3 gửi text (không cần mic). Server → Agent → TTS → audio về.</p>
-  <input type="text" id="textInput" placeholder="Nhập câu lệnh, ví dụ: mở đèn phòng khách" />
-  <button id="send">📤 Gửi</button>
-  <div class="log" id="logT"></div>
-  <audio id="playerT" controls hidden></audio>
-</div>
+  <!-- TAB: ESP32 -->
+  <section class="panel guide" id="panelEsp" role="tabpanel">
+    <div class="card">
+      <h2 class="card-title">Cấu hình ESP32-S3</h2>
+      <p class="card-desc">Firmware xiaozhi-esp32 kết nối Voice Gateway qua WebSocket.</p>
 
-<!-- FLOW 3: ESP32 GUIDE -->
-<div class="panel hidden guide" id="panelEsp">
-  <p class="note">Hướng dẫn cấu hình firmware ESP32-S3 (xiaozhi-esp32) để kết nối với Voice Gateway này.</p>
+      <h2>1. Địa chỉ WebSocket</h2>
+      <p class="card-desc" id="espWsHint" style="margin-top:0;margin-bottom:.5rem"></p>
+      <div class="urlrow">
+        <input type="text" id="wsUrl" readonly />
+        <button class="copybtn" id="copyWs">Copy</button>
+      </div>
 
-  <h2>1. Địa chỉ kết nối (WebSocket)</h2>
-  <p>ESP32 và PC phải cùng mạng LAN. Dùng IP của PC này (host đang chạy gateway):</p>
-  <div class="urlrow">
-    <input type="text" id="wsUrl" readonly />
-    <button class="copybtn" id="copyWs">Copy</button>
-  </div>
-  <p class="note">Port mặc định <code>3000</code>, đường dẫn <code>/ws</code>. Nếu gateway chạy port khác, sửa theo <code>PORT</code> trong <code>.env</code>.</p>
-
-  <h2>2. Gửi hello khi khởi tạo kết nối</h2>
-  <p>Firmware gửi JSON chào server ngay sau khi WebSocket mở:</p>
-  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>{
+      <h2>2. Hello message</h2>
+      <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>{
   "type": "hello",
   "version": 1,
   "device_id": "esp32-001",
@@ -138,52 +555,454 @@
     "frame_duration": 60
   }
 }</code></div>
-  <p>Server trả lời <code>hello_ack</code> kèm <code>session_id</code>. Từ lúc này ESP32 gửi binary Opus thô (v1, không header).</p>
 
-  <h2>3. Gửi audio (Opus raw)</h2>
-  <ul>
-    <li>Mỗi frame WebSocket binary = 1 packet Opus (60ms @ 16kHz mono).</li>
-    <li>Server tự VAD: phát hiện tiếng → <code>listening</code>, im lặng <code>SILENCE_MS=1200</code>ms → tự chốt câu.</li>
-    <li>Nếu firmware đã cắt VAD cục bộ, gửi <code>{"type":"audio_end"}</code> để chốt ngay.</li>
-  </ul>
+      <h2>3. Audio Opus raw</h2>
+      <ul>
+        <li>Mỗi frame binary = 1 packet Opus (60ms @ 16kHz mono).</li>
+        <li>VAD tự động: im lặng <code>SILENCE_MS=1200</code>ms → chốt câu.</li>
+        <li>Gửi <code>{"type":"audio_end"}</code> để chốt ngay.</li>
+      </ul>
 
-  <h2>4. Nhận phản hồi từ Gateway</h2>
-  <table class="gw">
-    <tr><th>Message</th><th>Ý nghĩa</th></tr>
-    <tr><td><code>{"type":"state","state":"listening"}</code></td><td>Đang nghe mic</td></tr>
-    <tr><td><code>{"type":"state","state":"processing"}</code></td><td>Đang decode/xử lý audio</td></tr>
-    <tr><td><code>{"type":"transcript_partial","text":"..."}</code></td><td>STT từng phần (nếu bật)</td></tr>
-    <tr><td><code>{"type":"transcript","text":"..."}</code></td><td>STT cuối câu</td></tr>
-    <tr><td><code>{"type":"state","state":"thinking"}</code></td><td>Agent đang suy nghĩ</td></tr>
-    <tr><td><code>{"type":"state","state":"speaking"}</code></td><td>Đang phát TTS</td></tr>
-    <tr><td><code>{"type":"agent_message","text":"..."}</code></td><td>Câu trả lời text</td></tr>
-    <tr><td><code>{"type":"screenshot","mime":"image/jpeg","data":"..."}</code></td><td>Ảnh màn hình PC (JPEG base64). Client gửi <code>{"type":"screenshot"}</code> hoặc nói “chụp màn hình”.</td></tr>
-    <tr><td><code>audio_start</code> + binary WAV + <code>audio_end</code></td><td>Audio TTS để phát qua speaker</td></tr>
-  </table>
+      <h2>4. Protocol messages</h2>
+      <table class="gw">
+        <tr><th>Message</th><th>Ý nghĩa</th></tr>
+        <tr><td><code>state: listening</code></td><td>Đang nghe</td></tr>
+        <tr><td><code>stt / transcript</code></td><td>Kết quả STT</td></tr>
+        <tr><td><code>llm / agent_message</code></td><td>Trả lời Agent</td></tr>
+        <tr><td><code>audio_start + WAV</code></td><td>TTS audio</td></tr>
+      </table>
 
-  <h2>5. Tuỳ chọn .env (trên PC gateway)</h2>
-  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>STT_PROVIDER=whisper
+      <h2>5. .env mẫu</h2>
+      <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>STT_PROVIDER=whisper
 WHISPER_MODEL=medium
-TTS_PROVIDER=pyttsx3        # none | pyttsx3 | edge | google
-TTS_VOICE=vi-VN-HoaiMyNeural
-AGENT_PROVIDER=mock         # mock | openclaw | hermes
-OPENCLAW_URL=http://127.0.0.1:18789
-HERMES_URL=http://127.0.0.1:8642
-LISTEN_MS=30000             # chờ có tiếng tối đa 30s
-SILENCE_MS=1200             # im lặng 1.2s -> chốt câu</code></div>
+TTS_PROVIDER=edge
+AGENT_PROVIDER=hermes
+HERMES_URL=http://127.0.0.1:8642</code></div>
+    </div>
+  </section>
 
-  <h2>6. Chạy gateway & flash</h2>
-  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code># PC (gateway):
-npm install
-node src/index.js
-# ESP32 connect: ws://&lt;PC_IP&gt;:3000/ws</code></div>
-  <p class="note">Firmware tham khảo: <code>github.com/78/xiaozhi-esp32</code> (board <code>esp-vocat</code>). Chỉ cần firmware tuân thủ protocol trên — gateway không cần code firmware.</p>
+  <!-- TAB: Thông tin -->
+  <section class="panel" id="panelInfo" role="tabpanel">
+    <div class="card">
+      <span class="info-badge">Loa Ai · Voice Gateway</span>
+      <h2 class="card-title">Nguồn gốc phần mềm</h2>
+      <p class="card-desc">
+        <strong>Voice Gateway</strong> là cầu nối giọng nói do
+        <a href="https://loaai.me" class="ext-link" id="linkLoaAiInline">LoaAi.me</a>
+        phát triển, giúp thiết bị <strong>Loa Ai</strong> (ESP32, trình duyệt, ứng dụng desktop)
+        giao tiếp bằng giọng nói với các agent AI trên máy tính của bạn.
+      </p>
+      <ul class="info-list">
+        <li><strong>STT</strong> — chuyển giọng nói thành văn bản (Whisper hoặc OpenAI).</li>
+        <li><strong>Agent</strong> — xử lý lệnh qua <strong>OpenClaw</strong>, <strong>Hermes</strong> hoặc mock để thử nhanh.</li>
+        <li><strong>TTS</strong> — đọc phản hồi bằng giọng nói (Edge, pyttsx3, …).</li>
+        <li><strong>ESP32</strong> — loa xiaozhi kết nối qua WebSocket Opus tới gateway local.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Kết nối Agent</h2>
+      <p class="card-desc">
+        Phần mềm được thiết kế để Loa Ai làm việc cùng backend agent bạn đã cài sẵn — không thay thế OpenClaw hay Hermes,
+        mà là lớp trung gian nhận audio, gọi agent, rồi trả lời bằng TTS.
+      </p>
+      <ul class="info-list">
+        <li><strong>OpenClaw</strong> — gateway tại <code>http://127.0.0.1:18789</code> (tab Cấu hình / Thiết lập).</li>
+        <li><strong>Hermes</strong> — API server tại <code>http://127.0.0.1:8642</code> (bật <code>API_SERVER_ENABLED</code>).</li>
+        <li>Có thể đổi agent bất cứ lúc nào trong tab <strong>Cấu hình</strong> mà không cần build lại app.</li>
+      </ul>
+      <div class="btn-row" style="margin-top:.75rem">
+        <button type="button" class="btn-primary" id="btnOpenLoaAi">🌐 Mở LoaAi.me</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Phiên bản</h2>
+      <p class="card-desc">Voice Gateway desktop · Node.js + Whisper + Agent</p>
+      <p id="appVersionInfoTab" style="font-size:.82rem;color:var(--text-muted);margin:0">
+        Phiên bản … · WebSocket <code style="font-size:.78rem">ws://localhost:3000/ws</code>
+      </p>
+    </div>
+  </section>
+
+  <!-- TAB: Cài đặt -->
+  <section class="panel" id="panelSettings" role="tabpanel">
+    <div class="card hidden" id="desktopSettingsCard">
+      <h2 class="card-title">Ứng dụng desktop</h2>
+      <p class="card-desc">Chạy nền sau khi đóng cửa sổ. Icon nằm ở khay hệ thống (Windows) hoặc menu bar (macOS).</p>
+      <label class="check-row full" style="margin:.5rem 0 .25rem">
+        <input type="checkbox" id="chkAutostart" />
+        <span id="autostartLabel">Khởi động cùng hệ thống</span>
+      </label>
+      <p class="reach" id="autostartHint" style="font-size:.76rem;margin-top:.35rem">
+        Tùy chọn — bật nếu muốn gateway tự chạy khi máy khởi động.
+      </p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Giao diện</h2>
+      <p class="card-desc">Chọn theme hiển thị. Mặc định: tối.</p>
+      <div class="theme-options">
+        <div class="theme-card selected" id="themeDark" data-theme="dark">
+          <div class="theme-preview dark"></div>
+          <span>🌙 Tối</span>
+        </div>
+        <div class="theme-card" id="themeLight" data-theme="light">
+          <div class="theme-preview light"></div>
+          <span>☀ Sáng</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Cổng máy chủ</h2>
+      <p class="card-desc">HTTP + WebSocket dùng chung một port. Đổi port sẽ ghi <code>.env</code> và restart gateway.</p>
+      <div class="port-settings">
+        <div class="port-field">
+          <span class="port-badge">TCP</span>
+          <div class="port-row">
+            <label for="inpPort" class="port-label">Port</label>
+            <input type="number" id="inpPort" min="1024" max="65535" step="1" inputmode="numeric" placeholder="3000" />
+          </div>
+          <span class="port-range">1024 – 65535</span>
+        </div>
+        <div class="port-actions btn-row">
+          <button type="button" class="btn-primary" id="btnRestartServer">Áp dụng &amp; restart</button>
+        </div>
+      </div>
+      <p class="reach" id="portHint"></p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Bảo mật WSS (LAN)</h2>
+      <p class="card-desc">Bật HTTPS/WSS cho ESP32 và thiết bị trong mạng LAN. Máy local (Tauri/trình duyệt) vẫn dùng <code>ws://127.0.0.1</code>.</p>
+      <label class="check-row full" style="margin:.5rem 0 .75rem">
+        <input type="checkbox" id="chkTlsEnabled" />
+        Bật WSS cho LAN
+      </label>
+      <div class="cfg">
+        <div class="full">
+          <label>WebSocket local</label>
+          <input type="text" id="wsPreviewLocal" readonly />
+        </div>
+        <div class="full">
+          <label>WebSocket LAN (ESP32)</label>
+          <input type="text" id="wsPreviewLan" readonly />
+        </div>
+      </div>
+      <p class="reach" id="tlsHint" style="margin-top:.5rem;font-size:.76rem">
+        ESP32 có thể <b>tự nhận cert</b> qua hello WSS (lần đầu bỏ qua verify TLS, lưu <code>tls_cert</code> vào NVS).
+        Hoặc copy cert bên dưới nếu firmware hỗ trợ nhập PEM.
+      </p>
+      <div class="cfg" id="tlsCertBlock" style="margin-top:.5rem;display:none">
+        <div class="full">
+          <label>Fingerprint SHA-256</label>
+          <input type="text" id="tlsFingerprint" readonly />
+        </div>
+        <div class="full btn-row">
+          <button type="button" class="btn-secondary" id="btnCopyTlsCert">Copy cert PEM</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <script>
+const APP_MODE = new URLSearchParams(location.search).get("app") === "1";
 const DEVICE_ID = "web-" + Math.random().toString(36).slice(2, 8);
 let wsA = null, wsT = null;
 
+const TABS = {
+  tabVoice: "panelVoice",
+  tabChat: "panelChat",
+  tabConfig: "panelConfig",
+  tabSetup: "panelSetup",
+  tabEsp: "panelEsp",
+  tabInfo: "panelInfo",
+  tabSettings: "panelSettings"
+};
+
+if (APP_MODE) {
+  document.getElementById("tabEsp").classList.add("hidden");
+  initDesktopSettings();
+}
+
+async function tauriInvoke(cmd, args = {}) {
+  const invoke = window.__TAURI__?.core?.invoke;
+  if (!invoke) return null;
+  return invoke(cmd, args);
+}
+
+async function initDesktopSettings() {
+  const card = document.getElementById("desktopSettingsCard");
+  if (!card) return;
+  card.classList.remove("hidden");
+
+  const labelEl = document.getElementById("autostartLabel");
+  const hintEl = document.getElementById("autostartHint");
+  const chk = document.getElementById("chkAutostart");
+  if (!labelEl || !hintEl || !chk) return;
+
+  try {
+    const platform = await tauriInvoke("desktop_platform");
+    if (platform === "macos") {
+      labelEl.textContent = "Khởi động khi đăng nhập (Launch at login)";
+      hintEl.textContent = "App hiện icon trên menu bar macOS. Bật tùy chọn này để gateway tự chạy sau khi đăng nhập.";
+    } else if (platform === "windows") {
+      labelEl.textContent = "Khởi động cùng Windows (Start with Windows)";
+      hintEl.textContent = "App hiện icon ở khay thông báo. Bật tùy chọn này để gateway tự chạy khi Windows khởi động.";
+    }
+
+    const enabled = await tauriInvoke("get_autostart_enabled");
+    if (typeof enabled === "boolean") chk.checked = enabled;
+  } catch (err) {
+    console.warn("desktop settings:", err);
+    hintEl.textContent = "Không đọc được trạng thái autostart: " + err.message;
+  }
+
+  chk.addEventListener("change", async () => {
+    const want = chk.checked;
+    chk.disabled = true;
+    try {
+      const enabled = await tauriInvoke("set_autostart_enabled", { enabled: want });
+      if (typeof enabled === "boolean") chk.checked = enabled;
+    } catch (err) {
+      chk.checked = !want;
+      hintEl.textContent = "Không đổi được autostart: " + err.message;
+    } finally {
+      chk.disabled = false;
+    }
+  });
+}
+
+/* ---- Theme ---- */
+const THEME_KEY = "vg-theme";
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
+  document.getElementById("themeDark").classList.toggle("selected", theme === "dark");
+  document.getElementById("themeLight").classList.toggle("selected", theme === "light");
+}
+applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+document.getElementById("themeDark").onclick = () => applyTheme("dark");
+document.getElementById("themeLight").onclick = () => applyTheme("light");
+
+let serverState = { tlsEnabled: false, lanIps: [], port: 3000, tlsCertSha256: null, tlsCertPem: null };
+
+function updateWsPreview(port, tlsEnabled, lanIps) {
+  const p = port || document.getElementById("inpPort")?.value || location.port || "3000";
+  const tls = tlsEnabled ?? document.getElementById("chkTlsEnabled")?.checked ?? serverState.tlsEnabled;
+  const ips = lanIps ?? serverState.lanIps ?? [];
+  const localEl = document.getElementById("wsPreviewLocal");
+  const lanEl = document.getElementById("wsPreviewLan");
+  if (localEl) localEl.value = `ws://127.0.0.1:${p}/ws`;
+  if (lanEl) {
+    if (tls && ips.length) {
+      lanEl.value = ips.map((ip) => `wss://${ip}:${p}/ws`).join(" · ");
+    } else if (tls) {
+      lanEl.value = `wss://<IP-PC>:${p}/ws`;
+    } else if (ips.length) {
+      lanEl.value = ips.map((ip) => `ws://${ip}:${p}/ws`).join(" · ");
+    } else {
+      lanEl.value = `ws://<IP-PC>:${p}/ws`;
+    }
+  }
+  syncEsp32WsUrl(p, tls, ips);
+  updateTlsCertUi(tls);
+}
+
+function updateTlsCertUi(tlsEnabled) {
+  const tls = tlsEnabled ?? serverState.tlsEnabled;
+  const block = document.getElementById("tlsCertBlock");
+  const fp = document.getElementById("tlsFingerprint");
+  if (!block) return;
+  block.style.display = tls ? "grid" : "none";
+  if (fp && serverState.tlsCertSha256) {
+    fp.value = serverState.tlsCertSha256;
+  }
+}
+
+async function refreshTlsCertInfo() {
+  if (!serverState.tlsEnabled) {
+    updateTlsCertUi(false);
+    return;
+  }
+  try {
+    const info = await fetchJson("/api/tls/info");
+    if (info.tls_cert_sha256) {
+      serverState.tlsCertSha256 = info.tls_cert_sha256;
+      serverState.tlsCertPem = info.tls_cert;
+    }
+    updateTlsCertUi(true);
+  } catch {
+    updateTlsCertUi(true);
+  }
+}
+
+function syncEsp32WsUrl(port, tlsEnabled, lanIps) {
+  const ips = lanIps ?? serverState.lanIps ?? [];
+  const tls = tlsEnabled ?? serverState.tlsEnabled;
+  const p = port ?? serverState.port ?? location.port ?? "3000";
+  const wsUrlEl = document.getElementById("wsUrl");
+  const hintEl = document.getElementById("espWsHint");
+  if (!wsUrlEl) return;
+  if (tls && ips.length) {
+    wsUrlEl.value = `wss://${ips[0]}:${p}/ws`;
+    if (hintEl) hintEl.textContent = "WSS bật — lần đầu ESP32 bỏ qua verify TLS, lưu tls_cert từ hello vào NVS.";
+  } else if (tls) {
+    wsUrlEl.value = `wss://<IP-PC>:${p}/ws`;
+    if (hintEl) hintEl.textContent = "WSS bật — thay <IP-PC> bằng IP máy chạy gateway.";
+  } else if (ips.length) {
+    wsUrlEl.value = `ws://${ips[0]}:${p}/ws`;
+    if (hintEl) hintEl.textContent = "Dùng IP LAN của máy chạy gateway (không dùng localhost trên ESP32).";
+  } else {
+    wsUrlEl.value = `ws://${location.hostname}:${p}/ws`;
+    if (hintEl) hintEl.textContent = "Thay hostname bằng IP LAN nếu ESP32 không kết nối được.";
+  }
+}
+
+async function loadServerSettings() {
+  try {
+    const s = await fetchJson("/api/server");
+    serverState = {
+      tlsEnabled: Boolean(s.tlsEnabled),
+      lanIps: s.lanIps || [],
+      port: s.port,
+      tlsCertSha256: s.tlsCertSha256 || null
+    };
+    document.getElementById("inpPort").value = s.port;
+    document.getElementById("chkTlsEnabled").checked = Boolean(s.tlsEnabled);
+    updateWsPreview(s.port, s.tlsEnabled, s.lanIps);
+    await refreshTlsCertInfo();
+  } catch {
+    document.getElementById("inpPort").value = location.port || "3000";
+    updateWsPreview();
+  }
+}
+
+document.getElementById("inpPort")?.addEventListener("input", (e) => updateWsPreview(e.target.value));
+document.getElementById("chkTlsEnabled")?.addEventListener("change", () => {
+  updateWsPreview();
+  updateTlsCertUi(document.getElementById("chkTlsEnabled").checked);
+});
+
+document.getElementById("btnCopyTlsCert")?.addEventListener("click", async () => {
+  try {
+    let pem = serverState.tlsCertPem;
+    if (!pem) {
+      const info = await fetchJson("/api/tls/info");
+      pem = info.tls_cert;
+    }
+    if (!pem) throw new Error("Chưa có cert");
+    await navigator.clipboard.writeText(pem);
+    const btn = document.getElementById("btnCopyTlsCert");
+    const old = btn.textContent;
+    btn.textContent = "✓ Đã copy";
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch (e) {
+    alert("Copy cert lỗi: " + e.message);
+  }
+});
+
+async function waitForServer(port, attempts = 40) {
+  const base = APP_MODE ? `http://127.0.0.1:${port}/?app=1` : `http://127.0.0.1:${port}/`;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/health`, { cache: "no-store" });
+      if (r.ok) {
+        location.href = base;
+        return true;
+      }
+    } catch { /* retry */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+document.getElementById("btnRestartServer").onclick = async () => {
+  const btn = document.getElementById("btnRestartServer");
+  const hint = document.getElementById("portHint");
+  const port = Number(document.getElementById("inpPort").value);
+  const tlsEnabled = document.getElementById("chkTlsEnabled").checked;
+  if (!port || port < 1024 || port > 65535) {
+    hint.className = "reach bad";
+    hint.textContent = "Port không hợp lệ (1024–65535)";
+    return;
+  }
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = `Đang restart gateway (port ${port}${tlsEnabled ? ", WSS LAN" : ""})…`;
+  try {
+    await fetchJson("/api/server/restart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ port, tlsEnabled })
+    });
+    hint.textContent = "Đang chờ server mới…";
+    const ok = await waitForServer(port);
+    if (!ok) {
+      hint.className = "reach bad";
+      hint.textContent = `Không kết nối được port ${port}. Kiểm tra terminal / chạy lại app.`;
+      btn.disabled = false;
+    }
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "Restart lỗi: " + e.message;
+    btn.disabled = false;
+  }
+};
+
+async function loadAppVersion() {
+  try {
+    const r = await fetch("/health");
+    const j = await r.json();
+    if (!j.version) return;
+    const versionLine = `Phiên bản ${j.version} · WebSocket <code style="font-size:.78rem">${j.wsUrlLocal || `ws://${location.host}/ws`}</code>${j.tlsEnabled ? " · WSS LAN" : ""}`;
+    const infoTab = document.getElementById("appVersionInfoTab");
+    if (infoTab) infoTab.innerHTML = versionLine;
+  } catch {}
+}
+loadAppVersion();
+
+async function openExternalUrl(url) {
+  try {
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (invoke) {
+      await invoke("open_external_url", { url });
+      return;
+    }
+  } catch (err) {
+    console.warn("open_external_url:", err);
+  }
+  try {
+    if (window.__TAURI__?.shell?.open) {
+      await window.__TAURI__.shell.open(url);
+      return;
+    }
+  } catch (err) {
+    console.warn("shell.open:", err);
+  }
+  window.location.href = url;
+}
+
+document.getElementById("btnOpenLoaAi")?.addEventListener("click", () => {
+  openExternalUrl("https://loaai.me");
+});
+
+document.getElementById("linkLoaAiInline")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openExternalUrl("https://loaai.me");
+});
+
+/* ---- Tabs ---- */
+function showTab(which) {
+  Object.keys(TABS).forEach((id) => {
+    document.getElementById(id)?.classList.toggle("active", id === which);
+    document.getElementById(TABS[id])?.classList.toggle("active", id === which);
+  });
+  if (which === "tabEsp") syncEsp32WsUrl();
+}
+Object.keys(TABS).forEach((id) => {
+  document.getElementById(id).onclick = () => showTab(id);
+});
+
+/* ---- Logger ---- */
 function makeLogger(logId, playerId) {
   const logEl = document.getElementById(logId);
   const player = document.getElementById(playerId);
@@ -208,7 +1027,6 @@ function setState(s) {
   document.getElementById("state").innerHTML = `<span class="dot ${s}"></span>${s}`;
 }
 
-// Shared message handler for both flows (xiaozhi protocol)
 function onMessage(ev, logger) {
   if (ev.data instanceof ArrayBuffer) {
     if (!window._tts) window._tts = [];
@@ -221,55 +1039,63 @@ function onMessage(ev, logger) {
     case "state": setState(msg.state); break;
     case "stt": logger.log("you", `🗣 ${msg.text}${msg.sttMs ? "  ⏱ " + msg.sttMs + "ms" : ""}`); break;
     case "llm": logger.log("ai", `🤖 ${msg.text}`); break;
-    case "tts": if (msg.state === "stop" && window._tts && window._tts.length) {
-        logger.play(new Blob(window._tts, { type: "audio/wav" }));
-        window._tts = [];
-      } break;
+    case "tts": if (msg.state === "stop" && window._tts?.length) { logger.play(new Blob(window._tts, { type: "audio/wav" })); window._tts = []; } break;
     case "audio_start": window._tts = []; break;
-    case "audio_end": if (window._tts && window._tts.length) { logger.play(new Blob(window._tts, { type: "audio/wav" })); window._tts = []; } break;
+    case "audio_end": if (window._tts?.length) { logger.play(new Blob(window._tts, { type: "audio/wav" })); window._tts = []; } break;
     case "config_ok":
-      logger.log("sys", `⚙ agent=${msg.agent} tts=${msg.tts} voice=${msg.voice || ""}`);
-      document.getElementById("cfgSummary").textContent = `agent=${msg.agent} tts=${msg.tts}`;
+      logger.log("sys", `⚙ agent=${msg.agent} tts=${msg.tts}`);
+      updateCfgSummary();
       break;
     case "error": logger.log("sys", `⚠ ${msg.code}: ${msg.message}`); break;
-    case "goodbye":
-      logger.log("sys", "👋 " + (msg.text || "goodbye") + " → idle / ngắt kết nối");
-      setState("idle");
-      break;
+    case "goodbye": logger.log("sys", "👋 " + (msg.text || "goodbye")); setState("idle"); break;
     case "screenshot":
       if (msg.data) {
         const img = document.getElementById("shotPreview");
         img.src = `data:${msg.mime || "image/jpeg"};base64,${msg.data}`;
         img.style.display = "block";
-        logger.log("sys", `🖼 screenshot ${msg.width}×${msg.height} (${Math.round((msg.bytes || 0) / 1024)} KB)`);
+        logger.log("sys", `🖼 ${msg.width}×${msg.height}`);
       }
       break;
   }
 }
 
 let serverOptions = null;
+
 function currentPrefs() {
-  return {
+  const body = {
     agent: document.getElementById("selAgent").value,
     tts: document.getElementById("selTts").value,
     voice: document.getElementById("selVoice").value,
+    stt: document.getElementById("selStt").value,
+    whisperModel: document.getElementById("selWhisperModel").value,
     telegramSync: document.getElementById("chkTelegram").checked
   };
+  const key = document.getElementById("inpSttApiKey").value.trim();
+  if (key) body.sttApiKey = key;
+  return body;
 }
+
+function refreshSttUi() {
+  const stt = document.getElementById("selStt").value;
+  document.getElementById("whisperModelWrap").style.display = stt === "whisper" ? "" : "none";
+  document.getElementById("openaiKeyWrap").classList.toggle("hidden", stt !== "openai");
+  const cur = serverOptions?.current;
+  let hint = stt;
+  if (stt === "whisper" && cur) hint += "/" + (cur.whisperModel || "medium");
+  if (stt === "openai") hint += " (online)";
+  const el = document.getElementById("sttHint");
+  if (el) el.textContent = hint;
+}
+
 function helloPayload() {
   const p = currentPrefs();
   return {
-    type: "hello",
-    version: 1,
-    features: { mcp: true },
-    transport: "websocket",
-    device_id: DEVICE_ID,
-    agent: p.agent,
-    tts: p.tts,
-    voice: p.voice,
+    type: "hello", version: 1, features: { mcp: true }, transport: "websocket",
+    device_id: DEVICE_ID, agent: p.agent, tts: p.tts, voice: p.voice,
     audio_params: { format: "pcm", sample_rate: 16000, channels: 1, frame_duration: 60 }
   };
 }
+
 function fillSelect(el, items, selected) {
   el.innerHTML = "";
   (items || []).forEach((it) => {
@@ -279,148 +1105,223 @@ function fillSelect(el, items, selected) {
     el.appendChild(o);
   });
 }
+
 function refreshVoices() {
   const tts = document.getElementById("selTts").value;
-  const voices = (serverOptions && serverOptions.voices && serverOptions.voices[tts]) || [];
+  const voices = serverOptions?.voices?.[tts] || [];
   document.getElementById("voiceWrap").style.display = voices.length ? "" : "none";
-  const keep = document.getElementById("selVoice").value;
-  fillSelect(document.getElementById("selVoice"), voices, keep || (voices[0] && voices[0].id));
+  fillSelect(document.getElementById("selVoice"), voices, document.getElementById("selVoice").value || voices[0]?.id);
 }
+
+function updateAgentActions() {
+  const agent = document.getElementById("selAgent").value;
+  document.getElementById("setupOpenclaw").classList.toggle("hidden", agent !== "openclaw");
+  document.getElementById("setupHermesCfg").classList.toggle("hidden", agent !== "hermes");
+}
+
 function updateReach() {
+  updateAgentActions();
   if (!serverOptions) return;
-  const agent = (serverOptions.agents || []).find((a) => a.id === document.getElementById("selAgent").value);
+  const agent = serverOptions.agents?.find((a) => a.id === document.getElementById("selAgent").value);
   const el = document.getElementById("reachHint");
-  if (!agent || agent.id === "mock") {
-    el.className = "reach"; el.textContent = "Mock trả lời local, không cần backend.";
-    return;
-  }
+  if (!agent || agent.id === "mock") { el.className = "reach"; el.textContent = "Mock trả lời local."; return; }
   el.className = "reach " + (agent.reachable ? "ok" : "bad");
-  el.textContent = agent.reachable
-    ? `${agent.label} đang reachable tại ${agent.url}`
-    : agent.id === "hermes"
-      ? `${agent.label} chưa reachable (${agent.url}). Hermes gateway đang chạy thì vẫn cần API_SERVER_ENABLED=true rồi hermes gateway restart. Port mặc định 8642 (không phải 8000). Token Voice Gateway (.env HERMES_TOKEN) phải trùng API_SERVER_KEY.`
-      : `${agent.label} chưa reachable (${agent.url}). Bật backend / kiểm tra token trong .env.`;
+  if (agent.reachable) {
+    el.textContent = `${agent.label} reachable · ${agent.url}`;
+  } else if (agent.id === "openclaw") {
+    el.textContent = `${agent.label} chưa reachable · ${agent.url}. Bấm «Kết nối OpenClaw» để tự setup.`;
+  } else if (agent.id === "hermes") {
+    el.textContent = `${agent.label} chưa reachable · ${agent.url}. Bấm «Setup Hermes API».`;
+  } else {
+    el.textContent = `${agent.label} chưa reachable · ${agent.url}`;
+  }
 }
+
+function updateCfgSummary() {
+  if (!serverOptions) return;
+  const c = serverOptions.current;
+  document.getElementById("cfgSummary").textContent =
+    `${c.agent} · stt:${c.stt}${c.stt === "whisper" ? "/" + c.whisperModel : ""} · tts:${c.tts}`;
+  refreshSttUi();
+}
+
 async function fetchJson(url, init) {
   const res = await fetch(url, init);
   const raw = await res.text();
   let data;
   try { data = JSON.parse(raw); }
-  catch {
-    throw new Error("server trả HTML thay vì JSON — restart Voice Gateway (node src/index.js) rồi F5 trang http://localhost:3000/");
-  }
+  catch { throw new Error("Server trả HTML — restart gateway rồi F5."); }
   if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
   return data;
 }
+
 async function loadOptions() {
-  serverOptions = await fetchJson("/api/options");
-  applyServerOptions(serverOptions);
+  applyServerOptions(await fetchJson("/api/options"));
 }
+
 function applyServerOptions(opts) {
   serverOptions = opts;
-  fillSelect(document.getElementById("selAgent"), serverOptions.agents, serverOptions.current.agent);
-  fillSelect(document.getElementById("selTts"), serverOptions.tts, serverOptions.current.tts);
+  fillSelect(document.getElementById("selAgent"), opts.agents, opts.current.agent);
+  fillSelect(document.getElementById("selStt"), opts.stt, opts.current.stt);
+  fillSelect(document.getElementById("selWhisperModel"), opts.whisperModels, opts.current.whisperModel);
+  fillSelect(document.getElementById("selTts"), opts.tts, opts.current.tts);
   refreshVoices();
-  if (serverOptions.current.voice) document.getElementById("selVoice").value = serverOptions.current.voice;
-  document.getElementById("cfgSummary").textContent =
-    `agent=${serverOptions.current.agent} tts=${serverOptions.current.tts}`;
-  if (serverOptions.telegram) {
-    document.getElementById("chkTelegram").checked = !!serverOptions.telegram.sync;
-  }
+  if (opts.current.voice) document.getElementById("selVoice").value = opts.current.voice;
+  if (opts.current.sttApiKeySet) document.getElementById("inpSttApiKey").placeholder = "•••••••• (đã lưu)";
+  updateCfgSummary();
+  if (opts.telegram) document.getElementById("chkTelegram").checked = !!opts.telegram.sync;
   updateReach();
 }
+
+document.getElementById("selStt").addEventListener("change", refreshSttUi);
 document.getElementById("selTts").addEventListener("change", refreshVoices);
+document.getElementById("selAgent").addEventListener("change", updateReach);
 document.getElementById("chkTelegram").addEventListener("change", async () => {
   try {
     applyServerOptions(await fetchJson("/api/options", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ telegramSync: document.getElementById("chkTelegram").checked })
     }));
-  } catch (e) {
-    document.getElementById("reachHint").textContent = e.message;
-  }
+  } catch (e) { document.getElementById("reachHint").textContent = e.message; }
 });
-document.getElementById("selAgent").addEventListener("change", updateReach);
+
 document.getElementById("applyCfg").onclick = async () => {
   const body = currentPrefs();
-  const opts = await fetchJson("/api/options", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  applyServerOptions(opts);
+  applyServerOptions(await fetchJson("/api/options", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
   const cfg = { type: "config", ...body };
-  if (wsA && wsA.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
-  if (wsT && wsT.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
+  if (wsA?.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
+  if (wsT?.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
 };
-document.getElementById("setupHermes").onclick = async () => {
-  const btn = document.getElementById("setupHermes");
+
+async function runAgentSetup(url, hintEl) {
+  const data = await fetchJson(url, { method: "POST" });
+  if (data.options) applyServerOptions(data.options);
+  hintEl.className = "reach " + (data.ok ? "ok" : "bad");
+  hintEl.textContent = data.ok
+    ? (data.steps || []).join(" · ")
+    : "Setup chưa xong. " + (data.error || (data.steps || []).join(" · "));
+  const cfg = { type: "config", ...currentPrefs() };
+  if (wsA?.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
+  if (wsT?.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
+  return data;
+}
+
+document.getElementById("setupOpenclaw").onclick = async () => {
+  const btn = document.getElementById("setupOpenclaw");
   const hint = document.getElementById("reachHint");
   btn.disabled = true;
   hint.className = "reach";
-  hint.textContent = "Đang setup Hermes API (ghi .env + restart gateway nếu cần)…";
+  hint.textContent = "Đang kết nối OpenClaw (bật API + ghi .env + restart gateway)…";
   try {
-    const data = await fetchJson("/api/setup/hermes", { method: "POST" });
-    if (data.options) applyServerOptions(data.options);
-    const lines = (data.steps || []).join(" · ");
-    hint.className = "reach " + (data.ok ? "ok" : "bad");
-    hint.textContent = data.ok
-      ? "Hermes API đã sẵn sàng. " + lines
-      : "Setup chưa xong. " + (data.error || lines);
-    const cfg = { type: "config", ...currentPrefs() };
-    if (wsA && wsA.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
-    if (wsT && wsT.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
+    await runAgentSetup("/api/setup/openclaw", hint);
   } catch (e) {
     hint.className = "reach bad";
-    hint.textContent = "Setup Hermes lỗi: " + e.message;
+    hint.textContent = "OpenClaw setup lỗi: " + e.message;
   } finally {
     btn.disabled = false;
   }
 };
-loadOptions().catch((e) => { document.getElementById("reachHint").textContent = "Không tải được /api/options: " + e.message; });
 
-// Tabs
-function showTab(which) {
-  const tabs = ["tabAudio", "tabText", "tabEsp"];
-  const panels = { tabAudio: "panelAudio", tabText: "panelText", tabEsp: "panelEsp" };
-  tabs.forEach((id) => document.getElementById(id).classList.toggle("active", id === which));
-  Object.entries(panels).forEach(([tab, panel]) => {
-    document.getElementById(panel).classList.toggle("hidden", tab !== which);
-  });
-  if (which === "tabEsp" && !document.getElementById("wsUrl").value) {
-    document.getElementById("wsUrl").value = `ws://${location.host}/ws`;
+document.getElementById("setupHermesCfg").onclick = async () => {
+  const btn = document.getElementById("setupHermesCfg");
+  const hint = document.getElementById("reachHint");
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = "Đang setup Hermes API…";
+  try {
+    await runAgentSetup("/api/setup/hermes", hint);
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "Hermes setup lỗi: " + e.message;
+  } finally {
+    btn.disabled = false;
   }
-}
-document.getElementById("tabAudio").onclick = () => showTab("tabAudio");
-document.getElementById("tabText").onclick = () => showTab("tabText");
-document.getElementById("tabEsp").onclick = () => showTab("tabEsp");
+};
 
-// Copy buttons
+document.getElementById("setupOpenclawTab").onclick = async () => {
+  const btn = document.getElementById("setupOpenclawTab");
+  const hint = document.getElementById("setupHint");
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = "Đang kết nối OpenClaw (bật API + ghi .env + restart gateway)…";
+  try {
+    await runAgentSetup("/api/setup/openclaw", hint);
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "OpenClaw setup lỗi: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+document.getElementById("setupHermes").onclick = async () => {
+  const btn = document.getElementById("setupHermes");
+  const hint = document.getElementById("setupHint");
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = "Đang setup Hermes API…";
+  try {
+    await runAgentSetup("/api/setup/hermes", hint);
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "Hermes setup lỗi: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+document.getElementById("setupDev").onclick = async () => {
+  const btn = document.getElementById("setupDev");
+  const hint = document.getElementById("setupHint");
+  btn.disabled = true; hint.textContent = "Đang cài dependencies…";
+  try {
+    const data = await fetchJson("/api/setup/dev", { method: "POST" });
+    hint.className = "reach " + (data.ok ? "ok" : "bad");
+    hint.textContent = (data.steps || []).join(" · ") + (data.errors?.length ? " · " + data.errors.join("; ") : "");
+  } catch (e) { hint.className = "reach bad"; hint.textContent = e.message; }
+  finally { btn.disabled = false; }
+};
+
+document.getElementById("runDiag").onclick = async () => {
+  const btn = document.getElementById("runDiag");
+  const list = document.getElementById("diagList");
+  const hint = document.getElementById("setupHint");
+  btn.disabled = true; list.innerHTML = ""; hint.textContent = "Đang kiểm tra…";
+  try {
+    const data = await fetchJson("/api/diagnostics");
+    hint.className = "reach " + (data.ok ? "ok" : "bad");
+    hint.textContent = data.ok ? "Tất cả OK" : "Có lỗi — xem bên dưới";
+    (data.checks || []).forEach((c) => {
+      const li = document.createElement("li");
+      li.className = c.status;
+      li.textContent = `${c.label}: ${c.message}`;
+      list.appendChild(li);
+    });
+  } catch (e) { hint.className = "reach bad"; hint.textContent = e.message; }
+  finally { btn.disabled = false; }
+};
+
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
-    const old = btn.textContent; btn.textContent = "✓ Copied";
-    setTimeout(() => btn.textContent = old, 1200);
+    const old = btn.textContent; btn.textContent = "✓"; setTimeout(() => btn.textContent = old, 1200);
   }).catch(() => {});
 }
 document.getElementById("copyWs").onclick = (e) => copyText(document.getElementById("wsUrl").value, e.target);
 document.querySelectorAll(".codebox .copybtn[data-copy]").forEach(b => {
-  b.onclick = (e) => {
-    const code = e.target.parentElement.querySelector("code").innerText;
-    copyText(code, e.target);
-  };
+  b.onclick = (e) => copyText(e.target.parentElement.querySelector("code").innerText, e.target);
 });
 
-// ---- FLOW 1: AUDIO ----
+/* ---- Audio ---- */
 const SAMPLE_RATE = 16000;
 let audioCtx, stream, processor;
+
 document.getElementById("start").onclick = async () => {
   try {
     wsA = new WebSocket(`ws://${location.host}/ws`);
     wsA.binaryType = "arraybuffer";
-    wsA.onopen = () => {
-      // xiaozhi hello with format "pcm" (web uses PCM; ESP32 firmware uses "opus")
-      wsA.send(JSON.stringify(helloPayload()));
-    };
+    wsA.onopen = () => wsA.send(JSON.stringify(helloPayload()));
     wsA.onmessage = (ev) => onMessage(ev, logA);
     wsA.onclose = () => logA.log("sys", "✕ disconnected");
-
     stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: SAMPLE_RATE, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const NATIVE = audioCtx.sampleRate;
@@ -433,58 +1334,43 @@ document.getElementById("start").onclick = async () => {
       const pcm = new Int16Array(outLen);
       for (let i = 0; i < outLen; i++) {
         const idx = i * ratio, i0 = Math.floor(idx), frac = idx - i0;
-        const s0 = input[i0] || 0, s1 = input[i0 + 1] || 0;
-        let s = s0 + (s1 - s0) * frac;
+        const s = (input[i0] || 0) + ((input[i0 + 1] || 0) - (input[i0] || 0)) * frac;
         pcm[i] = Math.max(-1, Math.min(1, s)) * 0x7fff;
       }
       if (wsA.readyState === WebSocket.OPEN) wsA.send(pcm.buffer);
     };
     src.connect(processor); processor.connect(audioCtx.destination);
     setState("listening");
-    logA.log("sys", "● recording… nói vào mic");
+    logA.log("sys", "● recording…");
+    showTab("tabVoice");
   } catch (err) { logA.log("sys", "⚠ " + err.message); }
 };
+
 document.getElementById("stop").onclick = () => {
-  if (processor) processor.disconnect();
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  if (wsA) wsA.close();
+  processor?.disconnect();
+  stream?.getTracks().forEach(t => t.stop());
+  wsA?.close();
   setState("idle"); logA.log("sys", "■ stopped");
 };
 
-function requestScreenshot() {
-  const ws = (wsA && wsA.readyState === WebSocket.OPEN) ? wsA
-    : (wsT && wsT.readyState === WebSocket.OPEN) ? wsT : null;
-  if (ws) {
-    ws.send(JSON.stringify({ type: "screenshot" }));
-    return;
-  }
+document.getElementById("shotBtn").onclick = () => {
+  const ws = wsA?.readyState === WebSocket.OPEN ? wsA : wsT?.readyState === WebSocket.OPEN ? wsT : null;
+  if (ws) { ws.send(JSON.stringify({ type: "screenshot" })); return; }
   wsT = new WebSocket(`ws://${location.host}/ws`);
   wsT.binaryType = "arraybuffer";
-  wsT.onopen = () => {
-    wsT.send(JSON.stringify(helloPayload()));
-    wsT.send(JSON.stringify({ type: "screenshot" }));
-    logT.log("sys", "🖼 đang chụp màn hình PC…");
-  };
+  wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload())); wsT.send(JSON.stringify({ type: "screenshot" })); logT.log("sys", "🖼 chụp màn hình…"); };
   wsT.onmessage = (ev) => onMessage(ev, logT);
-  wsT.onclose = () => logT.log("sys", "✕ disconnected");
-}
-document.getElementById("shotBtn").onclick = requestScreenshot;
+};
 
-// ---- FLOW 2: TEXT ----
 document.getElementById("send").onclick = () => {
   const input = document.getElementById("textInput");
   const text = input.value.trim();
   if (!text) return;
-  input.value = "";
-  input.focus();
+  input.value = ""; input.focus();
   if (!wsT || wsT.readyState !== WebSocket.OPEN) {
     wsT = new WebSocket(`ws://${location.host}/ws`);
     wsT.binaryType = "arraybuffer";
-    wsT.onopen = () => {
-      wsT.send(JSON.stringify(helloPayload()));
-      wsT.send(JSON.stringify({ type: "text", text }));
-      logT.log("you", "💬 " + text);
-    };
+    wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload())); wsT.send(JSON.stringify({ type: "text", text })); logT.log("you", "💬 " + text); };
     wsT.onmessage = (ev) => onMessage(ev, logT);
     wsT.onclose = () => logT.log("sys", "✕ disconnected");
   } else {
@@ -493,11 +1379,12 @@ document.getElementById("send").onclick = () => {
   }
 };
 document.getElementById("textInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    document.getElementById("send").click();
-  }
+  if (e.key === "Enter") { e.preventDefault(); document.getElementById("send").click(); }
 });
+
+if (APP_MODE) showTab("tabSetup");
+loadOptions().catch((e) => { document.getElementById("reachHint").textContent = "Lỗi tải options: " + e.message; });
+loadServerSettings();
 </script>
 </body>
 </html>

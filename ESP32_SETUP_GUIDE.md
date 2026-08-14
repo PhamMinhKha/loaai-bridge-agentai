@@ -25,7 +25,8 @@ nói chuyện với **Voice Gateway** chạy trên PC (Windows). Gateway xử l�
 | Thông số | Giá trị | Ghi chú |
 |----------|---------|---------|
 | Protocol | WebSocket | |
-| URL | `ws://<PC_IP>:3000/ws` | Port lấy từ `PORT` trong `.env` (mặc định 3000) |
+| URL (mặc định) | `ws://<PC_IP>:3000/ws` | Port lấy từ `PORT` trong `.env` |
+| URL (WSS bật) | `wss://<PC_IP>:3000/ws` | Bật trong tab **Cài đặt** → **WSS cho LAN** |
 | Audio format | **Opus** | Gateway decode Opus → PCM16 rồi chạy Whisper |
 | Sample rate | `16000` Hz | |
 | Channels | `1` (mono) | |
@@ -34,6 +35,33 @@ nói chuyện với **Voice Gateway** chạy trên PC (Windows). Gateway xử l�
 
 > Gateway cũng hỗ trợ `format:"pcm"` (PCM16 thô) cho web test, nhưng firmware
 > thật nên dùng **Opus** để tiết kiệm băng thông.
+
+### 2.1 WSS (bảo mật LAN)
+
+1. Mở Voice Gateway → tab **Cài đặt** → bật **WSS cho LAN** → restart.
+2. ESP32 dùng `wss://<PC_IP>:3000/ws` thay `ws://`.
+3. **Tự nhận cert (khuyến nghị)** — không cần embed vào firmware:
+   - Lần đầu: kết nối WSS với **bỏ qua verify cert** (insecure / `setInsecure()`).
+   - Gateway gửi ngay trong JSON `hello` / `hello_ack`:
+     - `tls_cert` — PEM public cert
+     - `tls_cert_sha256` — fingerprint để kiểm tra
+   - ESP32 lưu `tls_cert` vào **NVS/flash**, các lần sau verify bình thường.
+4. **Copy cert thủ công** (nếu firmware hỗ trợ): tab Cài đặt → **Copy cert PEM**, hoặc `GET /api/tls/cert`.
+5. Cert file trên PC: `data/tls/gateway.crt`.
+
+Nếu đổi IP LAN, xóa `data/tls/` và restart để tạo lại cert SAN.
+
+**Ví dụ xử lý hello trên ESP32 (pseudo):**
+
+```c
+// Lần đầu: client.setInsecure() hoặc tương đương ESP-IDF
+// Sau khi nhận hello JSON:
+if (cJSON_GetObjectItem(root, "tls_cert")) {
+    nvs_set_str(nvs, "vg_tls_cert", tls_cert_pem);
+    nvs_commit(nvs);
+}
+// Lần sau: load từ NVS, setRootCA, không dùng insecure
+```
 
 ---
 
@@ -204,6 +232,7 @@ Gateway trước. Tab **📖 Cấu hình ESP32** có sẵn bản hướng dẫn 
 | Triệu chứng | Nguyên nhân | Sửa |
 |-------------|------------|-----|
 | Connect fail | Sai IP / port, hoặc khác LAN | Check `ipconfig`, `PORT` trong `.env` |
+| WSS connect fail | Cert chưa lưu trên ESP32 | Lần đầu WSS + insecure, lưu `tls_cert` từ hello vào NVS |
 | Gateway báo `UNKNOWN_MESSAGE` | Gửi hello thiếu `audio_params.format` | Thêm `"format":"opus"` vào hello |
 | Không nghe TTS / loạn tiếng | Sai frame size Opus (không 60ms) | Đảm bảo 960 samples/frame |
 | Kẹt ở `idle` sau 1 câu | Đúng behaviour (30s timeout) | Gửi audio mới để wake lên |

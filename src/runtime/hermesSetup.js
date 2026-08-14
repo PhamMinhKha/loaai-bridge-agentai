@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { probeOpenAi } from "../agents/openaiChat.js";
 import { applyGlobalOptions, publicOptions } from "./options.js";
+import { upsertEnvFile } from "./envFile.js";
 
 const DEFAULT_PORT = 8642;
 const DEFAULT_HOST = "127.0.0.1";
@@ -45,26 +46,6 @@ export function findHermesBin() {
         path.join(os.homedir(), ".local", "bin", "hermes")
     ];
     return candidates.find((p) => fs.existsSync(p)) || "hermes";
-}
-
-function upsertEnvFile(filePath, entries) {
-    let text = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
-    if (text && !text.endsWith("\n")) text += "\n";
-    const added = [];
-    const updated = [];
-    for (const [key, value] of Object.entries(entries)) {
-        const re = new RegExp(`^${key}=.*$`, "m");
-        if (re.test(text)) {
-            text = text.replace(re, `${key}=${value}`);
-            updated.push(key);
-        } else {
-            text += `${key}=${value}\n`;
-            added.push(key);
-        }
-    }
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, text);
-    return { filePath, added, updated };
 }
 
 function run(cmd, args, timeoutMs = 45000) {

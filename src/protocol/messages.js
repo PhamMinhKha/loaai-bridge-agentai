@@ -1,6 +1,6 @@
 // Unified protocol message builders (Gateway -> ESP32)
-export function helloAck(deviceId, sessionId) {
-    return { type: "hello_ack", device_id: deviceId, session_id: sessionId };
+export function helloAck(deviceId, sessionId, extra = {}) {
+    return { type: "hello_ack", device_id: deviceId, session_id: sessionId, ...extra };
 }
 
 export function state(state) {

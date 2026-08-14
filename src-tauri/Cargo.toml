@@ -1,0 +1,27 @@
+[package]
+name = "voice-gateway-app"
+version = "1.0.0"
+description = "Voice Gateway Desktop App"
+authors = ["Voice Gateway"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["blocking"] }
+
+[lib]
+name = "voice_gateway_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "voice-gateway-app"
+path = "src/main.rs"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"

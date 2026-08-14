@@ -14,4 +14,7 @@ scripts/__pycache__/
 __pycache__/
 *.pyc
 data/stt/
+data/tls/
+dist/
+src-tauri/target/
 
