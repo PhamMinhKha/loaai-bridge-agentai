@@ -8,6 +8,8 @@ import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 import { sendJson } from "../runtime/log.js";
 import { saveSttDump } from "../runtime/sttDump.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
+import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
+import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
 
 const VOICE_ENERGY = 200;
 const PARTIAL_ENABLED = (process.env.PARTIAL_ENABLED || "false").toLowerCase() === "true";
@@ -118,6 +120,29 @@ export function createWebSocketServer(server, stt, opts = {}) {
                 send(msg.agentMessage("(đã xử lý lệnh cục bộ: âm lượng/mute)", session.sessionId));
                 return;
             }
+            if (isScreenshotCommand(text)) {
+                try {
+                    await sendScreenshot(send, {}, { compact: false });
+                    send(msg.agentMessage("Đã chụp màn hình máy tính.", session.sessionId));
+                } catch (e) {
+                    send(msg.error("SCREENSHOT_ERROR", e.message));
+                }
+                send(msg.state("idle"));
+                return;
+            }
+            if (isGoodbyeCommand(text)) {
+                send({ type: "goodbye", text });
+                send(msg.state("idle"));
+                clearSilence();
+                clearListen();
+                voiceStarted = false;
+                if (stt && stt.reset) stt.reset();
+                console.log("[ws] goodbye", JSON.stringify(text));
+                setTimeout(() => {
+                    try { if (socket.readyState === socket.OPEN) socket.close(); } catch { /* ignore */ }
+                }, 150);
+                return;
+            }
             send(msg.state("thinking"));
             const agent = resolveAgent(prefs);
             const tts = resolveTts(prefs);
@@ -202,6 +227,14 @@ export function createWebSocketServer(server, stt, opts = {}) {
                     case "text":
                         if (!session) throw new Error("Device not authenticated");
                         await handleTextCommand(message.text);
+                        break;
+
+                    case "screenshot":
+                        try {
+                            await sendScreenshot(send, message, { compact: false });
+                        } catch (e) {
+                            send(msg.error("SCREENSHOT_ERROR", e.message));
+                        }
                         break;
 
                     case "audio_start":

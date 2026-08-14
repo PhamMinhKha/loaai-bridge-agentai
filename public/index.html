@@ -44,7 +44,8 @@
   .cfg label { display: block; font-size: .78rem; color: #475569; margin-bottom: .2rem; }
   .cfg select, .cfg input { width: 100%; padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: .9rem; }
   .cfg .full { grid-column: 1 / -1; }
-  #applyCfg { background: #0f172a; color: #fff; }
+  #shotBtn { background: #0f766e; color: #fff; }
+  #shotPreview { max-width: 100%; border-radius: 8px; margin-top: .6rem; display: none; border: 1px solid #e2e8f0; }
   #setupHermes { background: #7c3aed; color: #fff; }
   #setupHermes:disabled { opacity: .6; cursor: wait; }
   .reach { font-size: .75rem; color: #64748b; margin-top: .5rem; }
@@ -95,7 +96,9 @@
   Web dùng PCM để đơn giản; firmware thật gửi Opus (server hỗ trợ cả 2).</p>
   <button id="start">▶ Bắt đầu ghi âm</button>
   <button id="stop">■ Dừng</button>
+  <button id="shotBtn">🖼 Chụp màn hình PC</button>
   <div class="log" id="logA"></div>
+  <img id="shotPreview" alt="screenshot" />
   <audio id="playerA" controls hidden></audio>
 </div>
 
@@ -154,6 +157,7 @@
     <tr><td><code>{"type":"state","state":"thinking"}</code></td><td>Agent đang suy nghĩ</td></tr>
     <tr><td><code>{"type":"state","state":"speaking"}</code></td><td>Đang phát TTS</td></tr>
     <tr><td><code>{"type":"agent_message","text":"..."}</code></td><td>Câu trả lời text</td></tr>
+    <tr><td><code>{"type":"screenshot","mime":"image/jpeg","data":"..."}</code></td><td>Ảnh màn hình PC (JPEG base64). Client gửi <code>{"type":"screenshot"}</code> hoặc nói “chụp màn hình”.</td></tr>
     <tr><td><code>audio_start</code> + binary WAV + <code>audio_end</code></td><td>Audio TTS để phát qua speaker</td></tr>
   </table>
 
@@ -228,6 +232,18 @@ function onMessage(ev, logger) {
       document.getElementById("cfgSummary").textContent = `agent=${msg.agent} tts=${msg.tts}`;
       break;
     case "error": logger.log("sys", `⚠ ${msg.code}: ${msg.message}`); break;
+    case "goodbye":
+      logger.log("sys", "👋 " + (msg.text || "goodbye") + " → idle / ngắt kết nối");
+      setState("idle");
+      break;
+    case "screenshot":
+      if (msg.data) {
+        const img = document.getElementById("shotPreview");
+        img.src = `data:${msg.mime || "image/jpeg"};base64,${msg.data}`;
+        img.style.display = "block";
+        logger.log("sys", `🖼 screenshot ${msg.width}×${msg.height} (${Math.round((msg.bytes || 0) / 1024)} KB)`);
+      }
+      break;
   }
 }
 
@@ -434,6 +450,25 @@ document.getElementById("stop").onclick = () => {
   if (wsA) wsA.close();
   setState("idle"); logA.log("sys", "■ stopped");
 };
+
+function requestScreenshot() {
+  const ws = (wsA && wsA.readyState === WebSocket.OPEN) ? wsA
+    : (wsT && wsT.readyState === WebSocket.OPEN) ? wsT : null;
+  if (ws) {
+    ws.send(JSON.stringify({ type: "screenshot" }));
+    return;
+  }
+  wsT = new WebSocket(`ws://${location.host}/ws`);
+  wsT.binaryType = "arraybuffer";
+  wsT.onopen = () => {
+    wsT.send(JSON.stringify(helloPayload()));
+    wsT.send(JSON.stringify({ type: "screenshot" }));
+    logT.log("sys", "🖼 đang chụp màn hình PC…");
+  };
+  wsT.onmessage = (ev) => onMessage(ev, logT);
+  wsT.onclose = () => logT.log("sys", "✕ disconnected");
+}
+document.getElementById("shotBtn").onclick = requestScreenshot;
 
 // ---- FLOW 2: TEXT ----
 document.getElementById("send").onclick = () => {

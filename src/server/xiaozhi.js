@@ -6,6 +6,8 @@ import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 import { sendJson } from "../runtime/log.js";
 import { saveSttDump } from "../runtime/sttDump.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
+import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
+import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
 
 const VOICE_ENERGY = 200;
 const SILENCE_MS = 1200;
@@ -30,6 +32,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
     let voiceStarted = false;
     let listenArmedAt = Date.now();
     let hotFrames = 0;
+    let holdIdle = false;
     let codec = (initialFormat === "pcm") ? "pcm" : "opus";
     let prefs = { ...initialPrefs };
     const opusDec = new OpusDecodeStream();
@@ -48,6 +51,17 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 armListen();
             }
         }, LISTEN_MS);
+    };
+
+    const enterIdle = (reason) => {
+        holdIdle = true;
+        voiceStarted = false;
+        hotFrames = 0;
+        clearSilence();
+        clearListen();
+        if (stt && stt.reset) stt.reset();
+        send({ type: "state", state: "idle" });
+        console.log("[xiaozhi] idle", reason || "");
     };
 
     const finalizeAudio = async (fromClient = false) => {
@@ -90,6 +104,27 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
     };
 
     const handleTextCommand = async (text) => {
+        if (isGoodbyeCommand(text)) {
+            send({ type: "goodbye", text });
+            enterIdle("goodbye " + JSON.stringify(text));
+            if (codec === "pcm") {
+                setTimeout(() => {
+                    try { if (socket.readyState === socket.OPEN) socket.close(); } catch { /* ignore */ }
+                }, 150);
+            }
+            return;
+        }
+        if (isScreenshotCommand(text)) {
+            try {
+                await sendScreenshot(send, {}, { compact: codec === "opus" });
+                send({ type: "llm", text: "Đã chụp màn hình máy tính.", emotion: "happy" });
+            } catch (e) {
+                send({ type: "error", code: "SCREENSHOT_ERROR", message: e.message });
+            }
+            send({ type: "state", state: "listening" });
+            armListen();
+            return;
+        }
         send({ type: "state", state: "thinking" });
         const agent = resolveAgent(prefs);
         const tts = resolveTts(prefs);
@@ -153,6 +188,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                     }
                     return;
                 }
+                if (holdIdle) return;
                 if (Date.now() - listenArmedAt < WARMUP_MS) {
                     return;
                 }
@@ -194,7 +230,14 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
             } else if (message.type === "text") {
                 console.log("[xiaozhi] text from client", JSON.stringify(message.text || ""));
                 await handleTextCommand(message.text);
+            } else if (message.type === "screenshot") {
+                try {
+                    await sendScreenshot(send, message, { compact: codec === "opus" });
+                } catch (e) {
+                    send({ type: "error", code: "SCREENSHOT_ERROR", message: e.message });
+                }
             } else if (message.type === "audio_start") {
+                holdIdle = false;
                 voiceStarted = false;
                 hotFrames = 0;
                 rxFrames = 0;
@@ -204,13 +247,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 send({ type: "state", state: "listening" });
                 armListen();
             } else if (message.type === "pause") {
-                voiceStarted = false;
-                hotFrames = 0;
-                clearSilence();
-                clearListen();
-                if (stt && stt.reset) stt.reset();
-                send({ type: "state", state: "idle" });
-                console.log("[xiaozhi] paused — stay idle until audio_start");
+                enterIdle("pause");
             } else if (message.type === "audio_end") {
                 if (!voiceStarted) {
                     console.log("[xiaozhi] ignore audio_end before voice");
