@@ -14,21 +14,22 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Changed
-- **Flow Text (tab 2) quay về `listening` sau khi trả lời xong** thay vì `idle`,
-  giữ vòng lặp hội thoại liên tục (`src/server/xiaozhi.js`, `src/server/websocket.js`).
-- **Tự động về `idle` sau 30s** (LISTEN_MS) nếu không có tiếng mới — fix lỗi
-  server gửi sai format `{type:"idle"}` thành `{type:"state", state:"idle"}`
-  (client/web/ESP32 không hiểu message cũ nên dot không đổi). Sửa 4 chỗ trong
-  `src/server/xiaozhi.js`.
+- **Decode Opus ưu tiên native `@discordjs/opus`**, fallback `opusscript` nếu native lỗi;
+  chuẩn hoá PCM về Buffer s16le (`src/audio/opusCodec.js`).
+- **Ngưỡng VAD thấp hơn** (`VOICE_ENERGY` 200 → 80) để bắt giọng nhỏ hơn trên ESP32.
+- **Giữ `listening`** khi hết `LISTEN_MS`, STT trống, STT lỗi, hoặc vừa hello;
+  timeout chỉ reset STT rồi arm lại vòng nghe (không đẩy `idle`).
+- Xử lý `audio_start`: reset STT/VAD và quay lại `listening`.
+- Flow Text (tab 2) quay về `listening` sau khi trả lời xong, giữ vòng hội thoại.
 - Cập nhật agents (`hermes.js`, `openclaw.js`), `audioManager.js`, `config.js`,
   `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
-- Loại bỏ các test script cũ (`test_client.js`, `test_stt_autocut.js`,
-  `test_stt_file.js`, `test_vad.js`, `test_whisper.js`).
 
 ### Fixed
-- State machine ESP32/text: sau TTS xong chuyển `speaking` → `listening` (chờ câu
-  tiếp) → `idle` (sau timeout), thay vì kẹt ở `idle`.
-- `vg_run.log` không còn bị track (đã bỏ khỏi git index; chỉ ignore runtime log).
+- `pcmChunkEnergy` đọc `Int16Array` trực tiếp từ Buffer (tránh copy `ArrayBuffer`
+  lệch offset, RMS = 0 → không bao giờ vào `voiceStarted`).
+- Log decode/frame rỗng để debug packet Opus không ra PCM.
+- State ESP32/text: sau TTS chuyển `speaking` → `listening` (chờ câu tiếp).
+- Message state dùng `{type:"state", state:"..."}` thay vì `{type:"idle"}`.
 
 ## [Initial] — ESP32-S3 xiaozhi protocol
 - Dual flow (audio Opus/PCM + text), 2-tab web test bench, Opus codec,

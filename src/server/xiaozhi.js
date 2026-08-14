@@ -4,15 +4,14 @@ import { mergePrefs, resolveAgent, resolveTts } from "../runtime/options.js";
 import { playTtsXiaozhi } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 
-const VOICE_ENERGY = 200;
+const VOICE_ENERGY = 80;
 const SILENCE_MS = 1200;
 const LISTEN_MS = 30000;
 
 function pcmChunkEnergy(buf) {
     try {
-        const ab = new ArrayBuffer(buf.length);
-        new Uint8Array(ab).set(buf);
-        const v = new Int16Array(ab);
+        if (!buf || buf.length < 2) return 0;
+        const v = new Int16Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 2));
         let sum = 0;
         for (let i = 0; i < v.length; i++) sum += v[i] * v[i];
         return v.length ? Math.sqrt(sum / v.length) : 0;
@@ -36,7 +35,11 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
     const armListen = () => {
         clearListen();
         listenTimer = setTimeout(() => {
-            if (!voiceStarted) { send({ type: "state", state: "idle" }); setState(deviceId, "idle"); stt.reset(); }
+            if (!voiceStarted) {
+                stt.reset();
+                send({ type: "state", state: "listening" });
+                armListen();
+            }
         }, LISTEN_MS);
     };
 
@@ -55,12 +58,12 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 send({ type: "stt", text: transcript.trim(), sttMs });
                 await handleTextCommand(transcript.trim());
             } else {
-                send({ type: "state", state: "idle" });
+                send({ type: "state", state: "listening" });
                 armListen();
             }
         } catch (e) {
             console.error("[xiaozhi-stt]", e.message);
-            send({ type: "state", state: "idle" });
+            send({ type: "state", state: "listening" });
             armListen();
         }
     };
@@ -112,22 +115,33 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         audio_params: { sample_rate: 16000, frame_duration: OPUS_FRAME_MS }
     });
     send({ type: "config_ok", ...prefs });
-    send({ type: "state", state: "idle" });
+    send({ type: "state", state: "listening" });
     armListen();
 
+    let rxFrames = 0;
     socket.on("message", async (data, isBinary) => {
         try {
             if (isBinary) {
                 const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
                 let pcm = buf;
                 if (codec === "opus") pcm = opusDec.decode(buf);
-                if (!pcm || !pcm.length) return;
+                rxFrames++;
+                if (!pcm || !pcm.length) {
+                    if (rxFrames <= 5 || rxFrames % 50 === 0) {
+                        console.warn("[xiaozhi] empty pcm after decode frame", rxFrames, "opus", buf.length);
+                    }
+                    return;
+                }
                 stt.push(pcm);
                 const energy = pcmChunkEnergy(pcm);
+                if (rxFrames <= 3 || rxFrames % 50 === 0) {
+                    console.log("[xiaozhi] audio frame", rxFrames, "opus", buf.length, "pcm", pcm.length, "rms", Math.round(energy));
+                }
                 if (!voiceStarted && energy > VOICE_ENERGY) {
                     voiceStarted = true;
                     clearListen();
                     send({ type: "state", state: "listening" });
+                    console.log("[xiaozhi] voice started rms", Math.round(energy));
                 }
                 if (voiceStarted && energy > VOICE_ENERGY) armSilence();
                 return;
@@ -150,6 +164,12 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 send({ type: "config_ok", ...prefs });
             } else if (message.type === "text") {
                 await handleTextCommand(message.text);
+            } else if (message.type === "audio_start") {
+                voiceStarted = false;
+                if (stt && stt.reset) stt.reset();
+                clearSilence();
+                send({ type: "state", state: "listening" });
+                armListen();
             } else if (message.type === "audio_end") {
                 await finalizeAudio(true);
             }
