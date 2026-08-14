@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Out,
-    [int]$MaxWidth = 1280,
+    [int]$MaxWidth = 360,
     [int]$Quality = 70
 )
 

@@ -7,7 +7,7 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 ### Added
 - **Chụp màn hình PC** gửi qua WebSocket: client `{ "type": "screenshot" }` hoặc nói
   “chụp màn hình”; server trả JPEG base64 (`type: screenshot`). Nút trên web UI.
-  ESP32 (Opus) nhận bản thu nhỏ; không gửi JPEG binary (firmware hiểu nhầm audio).
+  JPEG tối đa **360×auto** (nặng nhẹ cho màn ESP32). Không gửi JPEG binary.
 - Lệnh thoại **tạm biệt / kết thúc / good bye**: cả câu đúng cụm đó thì không gọi
   agent — về `idle`. Web (PCM) đóng WS; ESP32 giữ kết nối, bỏ audio đến `audio_start`.
 - Dump STT (text + WAV) vào `data/stt/` khi `STT_DUMP=true`.

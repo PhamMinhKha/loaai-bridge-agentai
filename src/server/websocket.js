@@ -122,7 +122,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
             }
             if (isScreenshotCommand(text)) {
                 try {
-                    await sendScreenshot(send, {}, { compact: false });
+                    await sendScreenshot(send, {});
                     send(msg.agentMessage("Đã chụp màn hình máy tính.", session.sessionId));
                 } catch (e) {
                     send(msg.error("SCREENSHOT_ERROR", e.message));

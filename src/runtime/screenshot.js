@@ -18,12 +18,12 @@ export function isScreenshotCommand(text) {
     return /\bscreenshot\b/.test(t) || /chup(\s*(anh|hinh))?\s*man\s*hinh/.test(t);
 }
 
-export function screenshotOptions(req = {}, { compact = false } = {}) {
-    const maxWidth = Number(req.maxWidth || process.env.SCREENSHOT_MAX_WIDTH || (compact ? 320 : 1280));
-    const quality = Number(req.quality || process.env.SCREENSHOT_QUALITY || (compact ? 50 : 70));
+export function screenshotOptions(req = {}, extra = {}) {
+    const maxWidth = Number(req.maxWidth || extra.maxWidth || process.env.SCREENSHOT_MAX_WIDTH || 360);
+    const quality = Number(req.quality || extra.quality || process.env.SCREENSHOT_QUALITY || 60);
     return {
-        maxWidth: Math.max(80, Math.min(3840, maxWidth || 1280)),
-        quality: Math.max(20, Math.min(95, quality || 70))
+        maxWidth: Math.max(80, Math.min(360, maxWidth || 360)),
+        quality: Math.max(20, Math.min(95, quality || 60))
     };
 }
 

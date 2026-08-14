@@ -1,0 +1,4 @@
+Voice Gateway listening on 0.0.0.0:3000 (agent=hermes tts=pyttsx3)
+  local:  http://127.0.0.1:3000/
+  LAN:    http://<IP-PC>:3000/   (máy khác cùng Wi‑Fi/LAN)
+[xiaozhi-stt] 3868 ms 

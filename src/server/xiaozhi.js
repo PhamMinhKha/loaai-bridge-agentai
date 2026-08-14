@@ -116,7 +116,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         }
         if (isScreenshotCommand(text)) {
             try {
-                await sendScreenshot(send, {}, { compact: codec === "opus" });
+                await sendScreenshot(send, {});
                 send({ type: "llm", text: "Đã chụp màn hình máy tính.", emotion: "happy" });
             } catch (e) {
                 send({ type: "error", code: "SCREENSHOT_ERROR", message: e.message });
@@ -232,7 +232,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 await handleTextCommand(message.text);
             } else if (message.type === "screenshot") {
                 try {
-                    await sendScreenshot(send, message, { compact: codec === "opus" });
+                    await sendScreenshot(send, message);
                 } catch (e) {
                     send({ type: "error", code: "SCREENSHOT_ERROR", message: e.message });
                 }
