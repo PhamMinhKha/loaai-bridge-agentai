@@ -1,0 +1,222 @@
+# Hướng dẫn cấu hình ESP32-S3 kết nối Voice Gateway
+
+Hướng dẫn code firmware ESP32-S3 (board `esp-vocat`, firmware `xiaozhi-esp32`) để
+nói chuyện với **Voice Gateway** chạy trên PC (Windows). Gateway xử lý STT → Agent
+→ TTS, ESP32 chỉ lo thu phát audio + giao tiếp WebSocket.
+
+---
+
+## 1. Chuẩn bị
+
+### 1.1 PC (chạy Gateway)
+- Gateway đã chạy: `node src/index.js` → lắng nghe `http://<PC_IP>:3000`
+- ESP32 và PC **cùng mạng LAN** (WiFi hoặc Ethernet).
+- Lấy IP của PC (cmd: `ipconfig` → IPv4, ví dụ `192.168.1.132`).
+
+### 1.2 ESP32-S3
+- Board: `esp-vocat` (hoặc bất kỳ ESP32-S3 có mic + speaker).
+- Firmware base: `github.com/78/xiaozhi-esp32`
+- Toolchain: ESP-IDF v5.x.
+
+---
+
+## 2. Thông số kết nối (phải khớp với Gateway)
+
+| Thông số | Giá trị | Ghi chú |
+|----------|---------|---------|
+| Protocol | WebSocket | |
+| URL | `ws://<PC_IP>:3000/ws` | Port lấy từ `PORT` trong `.env` (mặc định 3000) |
+| Audio format | **Opus** | Gateway decode Opus → PCM16 rồi chạy Whisper |
+| Sample rate | `16000` Hz | |
+| Channels | `1` (mono) | |
+| Frame duration | `60` ms | 1 packet Opus = 60ms (960 samples) |
+| Codec | Opus (raw, không header) | frame binary thô, version 1 |
+
+> Gateway cũng hỗ trợ `format:"pcm"` (PCM16 thô) cho web test, nhưng firmware
+> thật nên dùng **Opus** để tiết kiệm băng thông.
+
+---
+
+## 3. Luồng kết nối (state machine)
+
+```
+ESP32                                          Gateway (PC)
+  |---- WebSocket connect ws://<PC_IP>:3000/ws -->|
+  |                                               |
+  |<--- server hello {type:"hello", session_id,   |
+  |                 audio_params{sr:16000,frame:60}}|
+  |                                               |
+  |---- client hello (JSON) ---------------------->|  (xem §4)
+  |<--- {type:"state", state:"listening"} ---------|
+  |                                               |
+  |==== Opus audio frames (binary) ===============>|  (nói vào mic)
+  |                                               |  Gateway tự VAD:
+  |                                               |  - có tiếng -> listening
+  |                                               |  - im 1.2s   -> tự chốt câu
+  |<--- {type:"state", state:"processing"} -------|
+  |<--- {type:"stt", text:"..."} -----------------|  (STT kết quả)
+  |<--- {type:"state", state:"thinking"} ---------|
+  |<--- {type:"state", state:"speaking"} ---------|
+  |<--- {type:"tts", state:"start", text:"..."} --|
+  |<--- Opus audio frames (binary) ================|  (TTS trả về)
+  |<--- {type:"tts", state:"stop"} ---------------|
+  |<--- {type:"state", state:"listening"} --------|  (quay lại chờ câu tiếp)
+  |                                               |
+  |   (nếu 30s không nói gì)                       |
+  |<--- {type:"state", state:"idle"} -------------|
+```
+
+---
+
+## 4. Client Hello (gửi ngay sau khi WebSocket mở)
+
+ESP32 gửi JSON chào server (trước khi stream audio):
+
+```json
+{
+  "type": "hello",
+  "version": 1,
+  "device_id": "esp32-001",
+  "token": "test",
+  "transport": "websocket",
+  "audio_params": {
+    "format": "opus",
+    "sample_rate": 16000,
+    "channels": 1,
+    "frame_duration": 60
+  }
+}
+```
+
+Gateway trả lời (server hello) rồi chuyển sang `listening`:
+
+```json
+{
+  "type": "hello",
+  "session_id": "abc123...",
+  "transport": "websocket",
+  "audio_params": { "sample_rate": 16000, "frame_duration": 60 }
+}
+```
+
+> Nếu `audio_params.format` khác `"opus"`/`"pcm"`, Gateway coi là client thường
+> (không phải xiaozhi) và đòi `device_id` + `token` riêng. **Nhớ gửi format đúng.**
+
+---
+
+## 5. Gửi audio (ESP32 → Gateway)
+
+- Mỗi **frame binary WebSocket** = 1 packet Opus (60ms @ 16kHz mono).
+- Gateway tự VAD:
+  - Phát hiện tiếng → báo `state:"listening"`.
+  - Im lặng `SILENCE_MS=1200` ms → tự chốt câu, chạy STT.
+  - Nếu firmware đã cắt VAD cục bộ → gửi `{"type":"audio_end"}` để chốt ngay.
+- Từ lúc `listening`, nếu `LISTEN_MS=30000` ms không có tiếng → tự về `idle`.
+
+Ví dụ gửi binary (pseudo-code ESP-IDF):
+
+```c
+// encode PCM16 (16k mono) thành Opus 60ms, gửi raw qua WebSocket binary frame
+size_t opus_len = opus_encode(encoder, pcm_frame_960samples, 960, opus_buf, MAX_OPUS);
+websocket_send_binary(opus_buf, opus_len);   // 1 frame = 1 message
+```
+
+---
+
+## 6. Nhận phản hồi (Gateway → ESP32)
+
+ESP32 xử lý các message JSON sau:
+
+| Message | Ý nghĩa | Xử lý trên ESP32 |
+|---------|---------|------------------|
+| `{"type":"state","state":"listening"}` | Đang nghe mic | Bật mic, thu audio |
+| `{"type":"state","state":"processing"}` | Đang decode/xử lý | Tắt mic tạm |
+| `{"type":"stt","text":"..."}` | STT kết quả câu | Hiển thị (tùy chọn) |
+| `{"type":"state","state":"thinking"}` | Agent suy nghĩ | Chờ |
+| `{"type":"state","state":"speaking"}` | Đang phát TTS | Chuẩn bị speaker |
+| `{"type":"tts","state":"start","text":"..."}` | Bắt đầu TTS (có text) | Log text |
+| `Opus frames (binary)` | Audio TTS | Decode Opus → PCM → phát speaker |
+| `{"type":"tts","state":"stop"}` | Kết thúc TTS | Ngưng phát |
+| `{"type":"state","state":"idle"}` | Hết timeout, nghỉ | Chờ lần nói sau |
+
+> Lưu ý: format state nhận được là **`{type:"state", state:"..."}`**, KHÔNG phải
+> `{type:"idle"}` riêng lẻ. Một số bản cũ hay nhầm chỗ này.
+
+---
+
+## 7. Cấu hình `.env` trên PC (Gateway)
+
+File `D:\voice-gateway\.env` (mẫu xem `.env.example`):
+
+```ini
+PORT=3000
+
+# STT: Whisper local (không cần mạng)
+STT_PROVIDER=whisper
+WHISPER_MODEL=medium
+WHISPER_PYTHON=python          # dùng venv311 (Python 3.11) cho Whisper
+
+# TTS: pyttsx3 offline (Windows SAPI) hoặc edge-tts (cần mạng)
+TTS_PROVIDER=pyttsx3
+TTS_VOICE=vi-VN-HoaiMyNeural
+TTS_PYTHON=python
+
+# Agent: mock | openclaw | hermes
+AGENT_PROVIDER=mock
+
+# Timeout VAD / chờ
+LISTEN_MS=30000                # chờ có tiếng tối đa 30s rồi về idle
+SILENCE_MS=1200                # im lặng 1.2s -> tự chốt câu
+PARTIAL_ENABLED=false           # STT từng phần (tắt để giảm latency)
+```
+
+---
+
+## 8. Chạy thử
+
+### PC (Gateway)
+```bash
+cd D:\voice-gateway
+npm install
+node src/index.js
+# log: "Voice Gateway listening on :3000 (agent=mock)"
+```
+
+### ESP32 (flash)
+1. Build firmware `xiaozhi-esp32` với config:
+   - WiFi SSID/pass (cùng LAN với PC).
+   - WebSocket server: `ws://<PC_IP>:3000/ws`
+   - Audio: Opus, 16kHz, mono, 60ms frame.
+2. Flash & monitor:
+   ```bash
+   idf.py build flash monitor
+   ```
+3. Nói vào mic ESP32 → nghe tiếng trả lời từ speaker.
+
+### Kiểm tra nhanh qua Web (không cần ESP32)
+Mở `http://<PC_IP>:3000` → tab **Flow 1 (Mic)** hoặc **Flow 2 (Text)** để test
+Gateway trước. Tab **📖 Cấu hình ESP32** có sẵn bản hướng dẫn này trên giao diện.
+
+---
+
+## 9. Xử lý lỗi thường gặp
+
+| Triệu chứng | Nguyên nhân | Sửa |
+|-------------|------------|-----|
+| Connect fail | Sai IP / port, hoặc khác LAN | Check `ipconfig`, `PORT` trong `.env` |
+| Gateway báo `UNKNOWN_MESSAGE` | Gửi hello thiếu `audio_params.format` | Thêm `"format":"opus"` vào hello |
+| Không nghe TTS / loạn tiếng | Sai frame size Opus (không 60ms) | Đảm bảo 960 samples/frame |
+| Kẹt ở `idle` sau 1 câu | Đúng behaviour (30s timeout) | Gửi audio mới để wake lên |
+| Mic không thu được | ESP32 chưa bật mic khi `listening` | Xem state machine §3 |
+
+---
+
+## 10. Tóm tắt các điểm cốt lõi để code firmware
+
+1. Connect `ws://<PC_IP>:3000/ws`.
+2. Nhận server hello → gửi client hello có `audio_params.format="opus"`.
+3. Khi Gateway báo `state:"listening"` → thu mic, encode Opus 60ms/frame, gửi binary.
+4. Khi Gateway báo `state:"speaking"` → decode Opus binary thành PCM, phát speaker.
+5. Lặp lại vòng 3-4 cho tới khi `state:"idle"` (nghỉ 30s).
+
+Firmware chỉ cần tuân thủ protocol trên — **Gateway không cần sửa code firmware**.

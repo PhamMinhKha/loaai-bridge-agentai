@@ -1,0 +1,19 @@
+{
+  "name": "voice-gateway",
+  "version": "1.0.0",
+  "description": "Node.js Voice Gateway for ESP32 <-> OpenClaw/Hermes",
+  "type": "module",
+  "scripts": {
+    "setup:dev": "node scripts/setup-dev.js",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "dotenv": "^17.0.0",
+    "express": "^4.21.2",
+    "opus-decoder": "^0.7.11",
+    "opusscript": "^0.1.1",
+    "ws": "^8.18.0"
+  }
+}

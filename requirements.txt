@@ -1,0 +1,5 @@
+faster-whisper
+pyttsx3
+edge-tts
+gTTS
+miniaudio

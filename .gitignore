@@ -1,0 +1,17 @@
+node_modules/
+.env
+*.wav
+*.mp3
+!test/fixtures/*.wav
+!test/fixtures/*.mp3
+start_vg.ps1
+npm-debug.log
+.DS_Store
+echo_stream.py
+venv311/
+.venv/
+scripts/__pycache__/
+__pycache__/
+*.pyc
+vg_run.log
+

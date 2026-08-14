@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Voice Gateway — ESP32-S3 Test Bench</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 820px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; }
+  button { font-size: .95rem; padding: .5rem 1rem; margin: .2rem .3rem .2rem 0; border: 0; border-radius: 8px; cursor: pointer; }
+  .tabbtn { background: #e2e8f0; color: #0f172a; }
+  .tabbtn.active { background: #2563eb; color: #fff; }
+  #start { background: #16a34a; color: #fff; } #stop { background: #64748b; color: #fff; }
+  #send { background: #2563eb; color: #fff; }
+  #state { display: inline-block; padding: .2rem .6rem; border-radius: 999px; background: #e2e8f0; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #94a3b8; }
+  .dot.listening { background: #22c55e; } .dot.processing { background: #f59e0b; }
+  .dot.thinking { background: #a855f7; } .dot.speaking { background: #ef4444; } .dot.idle { background: #94a3b8; }
+  .panel { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+  .hidden { display: none; }
+  .log { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 1rem; height: 300px; overflow-y: auto; font-size: .85rem; white-space: pre-wrap; margin-top: .8rem; }
+  .you { color: #7dd3fc; } .you.partial { color: #64748b; font-style: italic; }
+  .ai { color: #86efac; } .sys { color: #94a3b8; }
+  audio { width: 100%; margin-top: .5rem; }
+  input[type=text] { width: 70%; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
+  .note { font-size: .8rem; color: #475569; }
+  .tabbtn.esp { background: #fef3c7; color: #92400e; }
+  .tabbtn.esp.active { background: #d97706; color: #fff; }
+  .guide h2 { font-size: 1.05rem; margin: 1.2rem 0 .4rem; color: #0f172a; }
+  .guide h3 { font-size: .92rem; margin: 1rem 0 .3rem; color: #1e293b; }
+  .guide p, .guide li { font-size: .88rem; color: #334155; line-height: 1.5; }
+  .guide ul { margin: .3rem 0 .3rem 1.1rem; padding: 0; }
+  .codebox { position: relative; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: .8rem 2.4rem .8rem .9rem; margin: .4rem 0; overflow-x: auto; }
+  .codebox code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; white-space: pre; }
+  .copybtn { position: absolute; top: .4rem; right: .4rem; background: #334155; color: #e2e8f0; border: 0; border-radius: 6px; padding: .2rem .5rem; font-size: .72rem; cursor: pointer; }
+  .copybtn:hover { background: #475569; }
+  .urlrow { display: flex; align-items: center; gap: .5rem; margin: .4rem 0; }
+  .urlrow input { flex: 1; padding: .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-family: ui-monospace, monospace; font-size: .85rem; }
+  table.gw { border-collapse: collapse; width: 100%; margin: .4rem 0; font-size: .82rem; }
+  table.gw th, table.gw td { border: 1px solid #e2e8f0; padding: .4rem .5rem; text-align: left; vertical-align: top; }
+  table.gw th { background: #f1f5f9; color: #0f172a; }
+  table.gw code { background: #f1f5f9; padding: .05rem .25rem; border-radius: 4px; font-size: .78rem; }
+  .cfg { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .8rem; align-items: end; }
+  .cfg label { display: block; font-size: .78rem; color: #475569; margin-bottom: .2rem; }
+  .cfg select, .cfg input { width: 100%; padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: .9rem; }
+  .cfg .full { grid-column: 1 / -1; }
+  #applyCfg { background: #0f172a; color: #fff; }
+  #setupHermes { background: #7c3aed; color: #fff; }
+  #setupHermes:disabled { opacity: .6; cursor: wait; }
+  .reach { font-size: .75rem; color: #64748b; margin-top: .5rem; }
+  .reach.ok { color: #16a34a; } .reach.bad { color: #dc2626; }
+  @media (max-width: 640px) { .cfg { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>🤖 Voice Gateway — ESP32-S3 Test Bench</h1>
+<p>Trạng thái: <span id="state"><span class="dot idle"></span>idle</span>
+  · <span id="cfgSummary" class="note">agent=… tts=…</span></p>
+
+<div class="panel" id="panelCfg">
+  <p class="note">Chọn Agent và TTS cho phiên web (áp dụng ngay, không cần restart server). Nút <b>Setup Hermes API</b> tự bật <code>API_SERVER</code> trên Hermes (cổng 8642), ghi token vào <code>.env</code>, rồi chọn agent Hermes.</p>
+  <div class="cfg">
+    <div>
+      <label for="selAgent">Agent</label>
+      <select id="selAgent"></select>
+    </div>
+    <div>
+      <label for="selTts">TTS</label>
+      <select id="selTts"></select>
+    </div>
+    <div id="voiceWrap">
+      <label for="selVoice">Giọng</label>
+      <select id="selVoice"></select>
+    </div>
+    <div class="full">
+      <label>&nbsp;</label>
+      <button id="applyCfg">Áp dụng</button>
+      <button id="setupHermes">⚡ Setup Hermes API</button>
+    </div>
+    <label class="full" style="display:flex;align-items:center;gap:.45rem;margin:0">
+      <input type="checkbox" id="chkTelegram" checked />
+      Đồng bộ hội thoại lên Telegram (Hermes)
+    </label>
+  </div>
+  <p class="reach" id="reachHint"></p>
+</div>
+
+<button class="tabbtn active" id="tabAudio">🎙️ Flow 1: Audio (Mic → STT → Agent → TTS)</button>
+<button class="tabbtn" id="tabText">💬 Flow 2: Text (Gõ → Agent → TTS)</button>
+<button class="tabbtn esp" id="tabEsp">📖 Cấu hình ESP32</button>
+
+<!-- FLOW 1: AUDIO -->
+<div class="panel" id="panelAudio">
+  <p class="note">Mô phỏng ESP32-S3 gửi audio stream (mic). Server decode → Whisper → Agent → TTS → audio về.
+  Web dùng PCM để đơn giản; firmware thật gửi Opus (server hỗ trợ cả 2).</p>
+  <button id="start">▶ Bắt đầu ghi âm</button>
+  <button id="stop">■ Dừng</button>
+  <div class="log" id="logA"></div>
+  <audio id="playerA" controls hidden></audio>
+</div>
+
+<!-- FLOW 2: TEXT -->
+<div class="panel hidden" id="panelText">
+  <p class="note">Mô phỏng ESP32-S3 gửi text (không cần mic). Server → Agent → TTS → audio về.</p>
+  <input type="text" id="textInput" placeholder="Nhập câu lệnh, ví dụ: mở đèn phòng khách" />
+  <button id="send">📤 Gửi</button>
+  <div class="log" id="logT"></div>
+  <audio id="playerT" controls hidden></audio>
+</div>
+
+<!-- FLOW 3: ESP32 GUIDE -->
+<div class="panel hidden guide" id="panelEsp">
+  <p class="note">Hướng dẫn cấu hình firmware ESP32-S3 (xiaozhi-esp32) để kết nối với Voice Gateway này.</p>
+
+  <h2>1. Địa chỉ kết nối (WebSocket)</h2>
+  <p>ESP32 và PC phải cùng mạng LAN. Dùng IP của PC này (host đang chạy gateway):</p>
+  <div class="urlrow">
+    <input type="text" id="wsUrl" readonly />
+    <button class="copybtn" id="copyWs">Copy</button>
+  </div>
+  <p class="note">Port mặc định <code>3000</code>, đường dẫn <code>/ws</code>. Nếu gateway chạy port khác, sửa theo <code>PORT</code> trong <code>.env</code>.</p>
+
+  <h2>2. Gửi hello khi khởi tạo kết nối</h2>
+  <p>Firmware gửi JSON chào server ngay sau khi WebSocket mở:</p>
+  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>{
+  "type": "hello",
+  "version": 1,
+  "device_id": "esp32-001",
+  "token": "test",
+  "transport": "websocket",
+  "audio_params": {
+    "format": "opus",
+    "sample_rate": 16000,
+    "channels": 1,
+    "frame_duration": 60
+  }
+}</code></div>
+  <p>Server trả lời <code>hello_ack</code> kèm <code>session_id</code>. Từ lúc này ESP32 gửi binary Opus thô (v1, không header).</p>
+
+  <h2>3. Gửi audio (Opus raw)</h2>
+  <ul>
+    <li>Mỗi frame WebSocket binary = 1 packet Opus (60ms @ 16kHz mono).</li>
+    <li>Server tự VAD: phát hiện tiếng → <code>listening</code>, im lặng <code>SILENCE_MS=1200</code>ms → tự chốt câu.</li>
+    <li>Nếu firmware đã cắt VAD cục bộ, gửi <code>{"type":"audio_end"}</code> để chốt ngay.</li>
+  </ul>
+
+  <h2>4. Nhận phản hồi từ Gateway</h2>
+  <table class="gw">
+    <tr><th>Message</th><th>Ý nghĩa</th></tr>
+    <tr><td><code>{"type":"state","state":"listening"}</code></td><td>Đang nghe mic</td></tr>
+    <tr><td><code>{"type":"state","state":"processing"}</code></td><td>Đang decode/xử lý audio</td></tr>
+    <tr><td><code>{"type":"transcript_partial","text":"..."}</code></td><td>STT từng phần (nếu bật)</td></tr>
+    <tr><td><code>{"type":"transcript","text":"..."}</code></td><td>STT cuối câu</td></tr>
+    <tr><td><code>{"type":"state","state":"thinking"}</code></td><td>Agent đang suy nghĩ</td></tr>
+    <tr><td><code>{"type":"state","state":"speaking"}</code></td><td>Đang phát TTS</td></tr>
+    <tr><td><code>{"type":"agent_message","text":"..."}</code></td><td>Câu trả lời text</td></tr>
+    <tr><td><code>audio_start</code> + binary WAV + <code>audio_end</code></td><td>Audio TTS để phát qua speaker</td></tr>
+  </table>
+
+  <h2>5. Tuỳ chọn .env (trên PC gateway)</h2>
+  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>STT_PROVIDER=whisper
+WHISPER_MODEL=medium
+TTS_PROVIDER=pyttsx3        # none | pyttsx3 | edge | google
+TTS_VOICE=vi-VN-HoaiMyNeural
+AGENT_PROVIDER=mock         # mock | openclaw | hermes
+OPENCLAW_URL=http://127.0.0.1:18789
+HERMES_URL=http://127.0.0.1:8642
+LISTEN_MS=30000             # chờ có tiếng tối đa 30s
+SILENCE_MS=1200             # im lặng 1.2s -> chốt câu</code></div>
+
+  <h2>6. Chạy gateway & flash</h2>
+  <div class="codebox"><button class="copybtn" data-copy>Copy</button><code># PC (gateway):
+npm install
+node src/index.js
+# ESP32 connect: ws://&lt;PC_IP&gt;:3000/ws</code></div>
+  <p class="note">Firmware tham khảo: <code>github.com/78/xiaozhi-esp32</code> (board <code>esp-vocat</code>). Chỉ cần firmware tuân thủ protocol trên — gateway không cần code firmware.</p>
+</div>
+
+<script>
+const DEVICE_ID = "web-" + Math.random().toString(36).slice(2, 8);
+let wsA = null, wsT = null;
+
+function makeLogger(logId, playerId) {
+  const logEl = document.getElementById(logId);
+  const player = document.getElementById(playerId);
+  let partialEl = null;
+  return {
+    log(cls, text) {
+      const d = document.createElement("div"); d.className = cls; d.textContent = text;
+      logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+    },
+    setPartial(t) {
+      if (!partialEl) { partialEl = document.createElement("div"); partialEl.className = "you partial"; logEl.appendChild(partialEl); }
+      partialEl.textContent = "🗣 … " + t;
+    },
+    clearPartial() { partialEl = null; },
+    play(blob) { const url = URL.createObjectURL(blob); player.src = url; player.hidden = false; player.play(); }
+  };
+}
+const logA = makeLogger("logA", "playerA");
+const logT = makeLogger("logT", "playerT");
+
+function setState(s) {
+  document.getElementById("state").innerHTML = `<span class="dot ${s}"></span>${s}`;
+}
+
+// Shared message handler for both flows (xiaozhi protocol)
+function onMessage(ev, logger) {
+  if (ev.data instanceof ArrayBuffer) {
+    if (!window._tts) window._tts = [];
+    window._tts.push(ev.data);
+    return;
+  }
+  const msg = JSON.parse(ev.data);
+  switch (msg.type) {
+    case "hello": logger.log("sys", `✓ connected (session ${msg.session_id.slice(0,8)})`); setState("idle"); window._tts = []; break;
+    case "state": setState(msg.state); break;
+    case "stt": logger.log("you", `🗣 ${msg.text}${msg.sttMs ? "  ⏱ " + msg.sttMs + "ms" : ""}`); break;
+    case "llm": logger.log("ai", `🤖 ${msg.text}`); break;
+    case "tts": if (msg.state === "stop" && window._tts && window._tts.length) {
+        logger.play(new Blob(window._tts, { type: "audio/wav" }));
+        window._tts = [];
+      } break;
+    case "audio_start": window._tts = []; break;
+    case "audio_end": if (window._tts && window._tts.length) { logger.play(new Blob(window._tts, { type: "audio/wav" })); window._tts = []; } break;
+    case "config_ok":
+      logger.log("sys", `⚙ agent=${msg.agent} tts=${msg.tts} voice=${msg.voice || ""}`);
+      document.getElementById("cfgSummary").textContent = `agent=${msg.agent} tts=${msg.tts}`;
+      break;
+    case "error": logger.log("sys", `⚠ ${msg.code}: ${msg.message}`); break;
+  }
+}
+
+let serverOptions = null;
+function currentPrefs() {
+  return {
+    agent: document.getElementById("selAgent").value,
+    tts: document.getElementById("selTts").value,
+    voice: document.getElementById("selVoice").value,
+    telegramSync: document.getElementById("chkTelegram").checked
+  };
+}
+function helloPayload() {
+  const p = currentPrefs();
+  return {
+    type: "hello",
+    version: 1,
+    features: { mcp: true },
+    transport: "websocket",
+    device_id: DEVICE_ID,
+    agent: p.agent,
+    tts: p.tts,
+    voice: p.voice,
+    audio_params: { format: "pcm", sample_rate: 16000, channels: 1, frame_duration: 60 }
+  };
+}
+function fillSelect(el, items, selected) {
+  el.innerHTML = "";
+  (items || []).forEach((it) => {
+    const o = document.createElement("option");
+    o.value = it.id; o.textContent = it.label || it.id;
+    if (it.id === selected) o.selected = true;
+    el.appendChild(o);
+  });
+}
+function refreshVoices() {
+  const tts = document.getElementById("selTts").value;
+  const voices = (serverOptions && serverOptions.voices && serverOptions.voices[tts]) || [];
+  document.getElementById("voiceWrap").style.display = voices.length ? "" : "none";
+  const keep = document.getElementById("selVoice").value;
+  fillSelect(document.getElementById("selVoice"), voices, keep || (voices[0] && voices[0].id));
+}
+function updateReach() {
+  if (!serverOptions) return;
+  const agent = (serverOptions.agents || []).find((a) => a.id === document.getElementById("selAgent").value);
+  const el = document.getElementById("reachHint");
+  if (!agent || agent.id === "mock") {
+    el.className = "reach"; el.textContent = "Mock trả lời local, không cần backend.";
+    return;
+  }
+  el.className = "reach " + (agent.reachable ? "ok" : "bad");
+  el.textContent = agent.reachable
+    ? `${agent.label} đang reachable tại ${agent.url}`
+    : agent.id === "hermes"
+      ? `${agent.label} chưa reachable (${agent.url}). Hermes gateway đang chạy thì vẫn cần API_SERVER_ENABLED=true rồi hermes gateway restart. Port mặc định 8642 (không phải 8000). Token Voice Gateway (.env HERMES_TOKEN) phải trùng API_SERVER_KEY.`
+      : `${agent.label} chưa reachable (${agent.url}). Bật backend / kiểm tra token trong .env.`;
+}
+async function fetchJson(url, init) {
+  const res = await fetch(url, init);
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch {
+    throw new Error("server trả HTML thay vì JSON — restart Voice Gateway (node src/index.js) rồi F5 trang http://localhost:3000/");
+  }
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  return data;
+}
+async function loadOptions() {
+  serverOptions = await fetchJson("/api/options");
+  applyServerOptions(serverOptions);
+}
+function applyServerOptions(opts) {
+  serverOptions = opts;
+  fillSelect(document.getElementById("selAgent"), serverOptions.agents, serverOptions.current.agent);
+  fillSelect(document.getElementById("selTts"), serverOptions.tts, serverOptions.current.tts);
+  refreshVoices();
+  if (serverOptions.current.voice) document.getElementById("selVoice").value = serverOptions.current.voice;
+  document.getElementById("cfgSummary").textContent =
+    `agent=${serverOptions.current.agent} tts=${serverOptions.current.tts}`;
+  if (serverOptions.telegram) {
+    document.getElementById("chkTelegram").checked = !!serverOptions.telegram.sync;
+  }
+  updateReach();
+}
+document.getElementById("selTts").addEventListener("change", refreshVoices);
+document.getElementById("chkTelegram").addEventListener("change", async () => {
+  try {
+    applyServerOptions(await fetchJson("/api/options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telegramSync: document.getElementById("chkTelegram").checked })
+    }));
+  } catch (e) {
+    document.getElementById("reachHint").textContent = e.message;
+  }
+});
+document.getElementById("selAgent").addEventListener("change", updateReach);
+document.getElementById("applyCfg").onclick = async () => {
+  const body = currentPrefs();
+  const opts = await fetchJson("/api/options", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  applyServerOptions(opts);
+  const cfg = { type: "config", ...body };
+  if (wsA && wsA.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
+  if (wsT && wsT.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
+};
+document.getElementById("setupHermes").onclick = async () => {
+  const btn = document.getElementById("setupHermes");
+  const hint = document.getElementById("reachHint");
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = "Đang setup Hermes API (ghi .env + restart gateway nếu cần)…";
+  try {
+    const data = await fetchJson("/api/setup/hermes", { method: "POST" });
+    if (data.options) applyServerOptions(data.options);
+    const lines = (data.steps || []).join(" · ");
+    hint.className = "reach " + (data.ok ? "ok" : "bad");
+    hint.textContent = data.ok
+      ? "Hermes API đã sẵn sàng. " + lines
+      : "Setup chưa xong. " + (data.error || lines);
+    const cfg = { type: "config", ...currentPrefs() };
+    if (wsA && wsA.readyState === WebSocket.OPEN) wsA.send(JSON.stringify(cfg));
+    if (wsT && wsT.readyState === WebSocket.OPEN) wsT.send(JSON.stringify(cfg));
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "Setup Hermes lỗi: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+loadOptions().catch((e) => { document.getElementById("reachHint").textContent = "Không tải được /api/options: " + e.message; });
+
+// Tabs
+function showTab(which) {
+  const tabs = ["tabAudio", "tabText", "tabEsp"];
+  const panels = { tabAudio: "panelAudio", tabText: "panelText", tabEsp: "panelEsp" };
+  tabs.forEach((id) => document.getElementById(id).classList.toggle("active", id === which));
+  Object.entries(panels).forEach(([tab, panel]) => {
+    document.getElementById(panel).classList.toggle("hidden", tab !== which);
+  });
+  if (which === "tabEsp" && !document.getElementById("wsUrl").value) {
+    document.getElementById("wsUrl").value = `ws://${location.host}/ws`;
+  }
+}
+document.getElementById("tabAudio").onclick = () => showTab("tabAudio");
+document.getElementById("tabText").onclick = () => showTab("tabText");
+document.getElementById("tabEsp").onclick = () => showTab("tabEsp");
+
+// Copy buttons
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const old = btn.textContent; btn.textContent = "✓ Copied";
+    setTimeout(() => btn.textContent = old, 1200);
+  }).catch(() => {});
+}
+document.getElementById("copyWs").onclick = (e) => copyText(document.getElementById("wsUrl").value, e.target);
+document.querySelectorAll(".codebox .copybtn[data-copy]").forEach(b => {
+  b.onclick = (e) => {
+    const code = e.target.parentElement.querySelector("code").innerText;
+    copyText(code, e.target);
+  };
+});
+
+// ---- FLOW 1: AUDIO ----
+const SAMPLE_RATE = 16000;
+let audioCtx, stream, processor;
+document.getElementById("start").onclick = async () => {
+  try {
+    wsA = new WebSocket(`ws://${location.host}/ws`);
+    wsA.binaryType = "arraybuffer";
+    wsA.onopen = () => {
+      // xiaozhi hello with format "pcm" (web uses PCM; ESP32 firmware uses "opus")
+      wsA.send(JSON.stringify(helloPayload()));
+    };
+    wsA.onmessage = (ev) => onMessage(ev, logA);
+    wsA.onclose = () => logA.log("sys", "✕ disconnected");
+
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: SAMPLE_RATE, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const NATIVE = audioCtx.sampleRate;
+    const src = audioCtx.createMediaStreamSource(stream);
+    processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      const ratio = NATIVE / SAMPLE_RATE;
+      const outLen = Math.round(input.length / ratio);
+      const pcm = new Int16Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const idx = i * ratio, i0 = Math.floor(idx), frac = idx - i0;
+        const s0 = input[i0] || 0, s1 = input[i0 + 1] || 0;
+        let s = s0 + (s1 - s0) * frac;
+        pcm[i] = Math.max(-1, Math.min(1, s)) * 0x7fff;
+      }
+      if (wsA.readyState === WebSocket.OPEN) wsA.send(pcm.buffer);
+    };
+    src.connect(processor); processor.connect(audioCtx.destination);
+    setState("listening");
+    logA.log("sys", "● recording… nói vào mic");
+  } catch (err) { logA.log("sys", "⚠ " + err.message); }
+};
+document.getElementById("stop").onclick = () => {
+  if (processor) processor.disconnect();
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (wsA) wsA.close();
+  setState("idle"); logA.log("sys", "■ stopped");
+};
+
+// ---- FLOW 2: TEXT ----
+document.getElementById("send").onclick = () => {
+  const input = document.getElementById("textInput");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  input.focus();
+  if (!wsT || wsT.readyState !== WebSocket.OPEN) {
+    wsT = new WebSocket(`ws://${location.host}/ws`);
+    wsT.binaryType = "arraybuffer";
+    wsT.onopen = () => {
+      wsT.send(JSON.stringify(helloPayload()));
+      wsT.send(JSON.stringify({ type: "text", text }));
+      logT.log("you", "💬 " + text);
+    };
+    wsT.onmessage = (ev) => onMessage(ev, logT);
+    wsT.onclose = () => logT.log("sys", "✕ disconnected");
+  } else {
+    wsT.send(JSON.stringify({ type: "text", text }));
+    logT.log("you", "💬 " + text);
+  }
+};
+document.getElementById("textInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("send").click();
+  }
+});
+</script>
+</body>
+</html>
