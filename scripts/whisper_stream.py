@@ -32,7 +32,15 @@ def main():
         wav += b"fmt "; wav += struct.pack("<IHHIIHH", 16, 1, 1, SR, SR*2, 2, 16)
         wav += b"data"; wav += struct.pack("<I", len(pcm)); wav += pcm
         wf.write(bytes(wav)); wf.close()
-        segments, _ = model.transcribe(wf.name, language="vi", beam_size=5, without_timestamps=True)
+        segments, _ = model.transcribe(
+            wf.name,
+            language="vi",
+            beam_size=5,
+            without_timestamps=True,
+            vad_filter=True,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.6,
+        )
         text = "".join(s.text for s in segments).strip()
         os.unlink(wf.name)
         return text

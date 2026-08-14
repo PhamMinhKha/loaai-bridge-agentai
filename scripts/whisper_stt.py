@@ -16,7 +16,14 @@ def main():
     try:
         from faster_whisper import WhisperModel
         m = WhisperModel(model, device="cpu", compute_type="int8")
-        segments, _ = m.transcribe(wav, language="vi", beam_size=5)
+        segments, _ = m.transcribe(
+            wav,
+            language="vi",
+            beam_size=5,
+            vad_filter=True,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.6,
+        )
         text = "".join(s.text for s in segments).strip()
         print(json.dumps({"text": text}))
     except Exception as e:

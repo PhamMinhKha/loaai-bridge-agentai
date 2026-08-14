@@ -148,9 +148,12 @@ export class StreamingSTT {
     }
 
     async flush() {
-        if (this.provider !== "whisper") return "";
-        // buffer was already streamed chunk-by-chunk via push(); worker holds it.
-        // just send F (clear) to transcribe what it has.
+        if (this.provider !== "whisper") {
+            this.lastPcm = Buffer.alloc(0);
+            return "";
+        }
+        const pcm = this._buf;
+        this.lastPcm = pcm;
         this._buf = Buffer.alloc(0);
         const r = await this._request("F", null);
         return r ? (r.text || "") : "";
@@ -160,6 +163,7 @@ export class StreamingSTT {
         this._ensure();
         if (this.proc) this.proc.stdin.write(Buffer.from([ord_c("R")]));
         this._buf = Buffer.alloc(0);
+        this.lastPcm = Buffer.alloc(0);
     }
 }
 

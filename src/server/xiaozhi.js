@@ -3,6 +3,9 @@ import { getOrCreateSession, setState } from "../sessions/sessionManager.js";
 import { mergePrefs, resolveAgent, resolveTts } from "../runtime/options.js";
 import { playTtsXiaozhi } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
+import { sendJson } from "../runtime/log.js";
+import { saveSttDump } from "../runtime/sttDump.js";
+import { acceptSttText } from "../runtime/sttFilter.js";
 
 const VOICE_ENERGY = 200;
 const SILENCE_MS = 1200;
@@ -32,7 +35,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
     const opusDec = new OpusDecodeStream();
     const opusEnc = new OpusEncodeStream();
 
-    const send = (o) => { if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(o)); };
+    const send = (o) => sendJson(socket, o, "xiaozhi");
     const clearSilence = () => { if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; } };
     const clearListen = () => { if (listenTimer) { clearTimeout(listenTimer); listenTimer = null; } };
     const armSilence = () => { clearSilence(); silenceTimer = setTimeout(() => finalizeAudio(), SILENCE_MS); };
@@ -57,10 +60,24 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
         try {
             const transcript = await stt.flush();
             const sttMs = Date.now() - t0;
-            console.log("[xiaozhi-stt]", sttMs, "ms", (transcript || "").slice(0, 40));
-            if (transcript && transcript.trim()) {
-                send({ type: "stt", text: transcript.trim(), sttMs });
-                await handleTextCommand(transcript.trim());
+            const raw = transcript == null ? "" : String(transcript);
+            const text = acceptSttText(raw);
+            if (raw.trim() && !text) {
+                console.log("[xiaozhi-stt] drop hallucination", sttMs, "ms", JSON.stringify(raw.trim()));
+            } else {
+                console.log("[xiaozhi-stt]", sttMs, "ms", text ? JSON.stringify(text) : "(empty)");
+            }
+            saveSttDump({
+                text: text || (raw.trim() ? `(hallucination) ${raw.trim()}` : ""),
+                pcm: stt.lastPcm,
+                deviceId,
+                source: "xiaozhi",
+                sttMs
+            });
+            if (text) {
+                const ok = send({ type: "stt", text, sttMs });
+                console.log("[xiaozhi-stt] transcript → client:", ok ? "yes" : "NO");
+                await handleTextCommand(text);
             } else {
                 send({ type: "state", state: "listening" });
                 armListen();
@@ -175,6 +192,7 @@ export function handleXiaozhi(socket, stt, initialFormat, initialPrefs, extra = 
                 prefs = mergePrefs(prefs, message);
                 send({ type: "config_ok", ...prefs });
             } else if (message.type === "text") {
+                console.log("[xiaozhi] text from client", JSON.stringify(message.text || ""));
                 await handleTextCommand(message.text);
             } else if (message.type === "audio_start") {
                 voiceStarted = false;

@@ -13,5 +13,5 @@ venv311/
 scripts/__pycache__/
 __pycache__/
 *.pyc
-vg_run.log
+data/stt/
 

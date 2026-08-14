@@ -5,6 +5,9 @@ import { handleXiaozhi } from "./xiaozhi.js";
 import { getPrefs, mergePrefs, resolveAgent, resolveTts } from "../runtime/options.js";
 import { playTtsNative } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
+import { sendJson } from "../runtime/log.js";
+import { saveSttDump } from "../runtime/sttDump.js";
+import { acceptSttText } from "../runtime/sttFilter.js";
 
 const VOICE_ENERGY = 200;
 const PARTIAL_ENABLED = (process.env.PARTIAL_ENABLED || "false").toLowerCase() === "true";
@@ -35,11 +38,7 @@ export function createWebSocketServer(server, stt, opts = {}) {
         let voiceStarted = false;
         let prefs = { ...getPrefs() };
 
-        const send = (obj) => {
-            if (socket.readyState === socket.OPEN) {
-                socket.send(JSON.stringify(obj));
-            }
-        };
+        const send = (obj) => sendJson(socket, obj, "ws");
 
         const applyClientPrefs = (patch) => {
             prefs = mergePrefs(prefs, patch);
@@ -83,10 +82,24 @@ export function createWebSocketServer(server, stt, opts = {}) {
             try {
                 const transcript = await stt.flush();
                 const sttMs = Date.now() - t0;
-                console.log("[stt] processing took", sttMs, "ms for", (transcript||"").length, "chars");
-                if (transcript && transcript.trim()) {
-                    send(msg.transcript(transcript.trim(), { sttMs }));
-                    await handleTextCommand(transcript.trim());
+                const raw = transcript == null ? "" : String(transcript);
+                const text = acceptSttText(raw);
+                if (raw.trim() && !text) {
+                    console.log("[stt] drop hallucination", sttMs, "ms", JSON.stringify(raw.trim()));
+                } else {
+                    console.log("[stt]", sttMs, "ms", text ? JSON.stringify(text) : "(empty)");
+                }
+                saveSttDump({
+                    text: text || (raw.trim() ? `(hallucination) ${raw.trim()}` : ""),
+                    pcm: stt.lastPcm,
+                    deviceId,
+                    source: "ws",
+                    sttMs
+                });
+                if (text) {
+                    const ok = send(msg.transcript(text, { sttMs }));
+                    console.log("[stt] transcript → client:", ok ? "yes" : "NO");
+                    await handleTextCommand(text);
                 } else {
                     send(msg.state("idle"));
                 }
