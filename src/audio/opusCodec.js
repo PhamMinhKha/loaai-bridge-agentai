@@ -1,12 +1,24 @@
-import opusPkg from "@discordjs/opus";
-const { OpusEncoder } = opusPkg;
+import { createRequire } from "node:module";
 import OpusScript from "opusscript";
+
+const require = createRequire(import.meta.url);
 
 const SR = 16000;
 const CHANNELS = 1;
 const FRAME_MS = 60; // xiaozhi default opus frame duration
 const FRAME_SAMPLES = (SR * FRAME_MS) / 1000; // 960
 const FRAME_BYTES = FRAME_SAMPLES * 2; // PCM16 = 1920 bytes per frame
+
+/** Lazy — tránh crash khi native addon không khớp Node (bản desktop macOS). */
+function loadNativeOpusEncoder() {
+    try {
+        const { OpusEncoder } = require("@discordjs/opus");
+        return OpusEncoder;
+    } catch (e) {
+        console.warn("[opus] native module unavailable, using opusscript:", e.message);
+        return null;
+    }
+}
 
 function toPcm16Buffer(pcm) {
     if (!pcm) return Buffer.alloc(0);
@@ -21,7 +33,14 @@ function toPcm16Buffer(pcm) {
 // Encoder: PCM16 Buffer (s16le) -> array of raw opus packets (60ms each)
 export class OpusEncodeStream {
     constructor() {
-        this.enc = new OpusEncoder(SR, CHANNELS);
+        const Native = loadNativeOpusEncoder();
+        if (Native) {
+            this.native = new Native(SR, CHANNELS);
+            this.script = null;
+        } else {
+            this.native = null;
+            this.script = new OpusScript(SR, CHANNELS, OpusScript.Application.VOIP);
+        }
     }
     encode(pcm) {
         const out = [];
@@ -29,7 +48,12 @@ export class OpusEncodeStream {
         while (offset + FRAME_BYTES <= pcm.length) {
             const frame = pcm.subarray(offset, offset + FRAME_BYTES);
             try {
-                const pkt = this.enc.encode(frame);
+                let pkt;
+                if (this.native) {
+                    pkt = this.native.encode(frame);
+                } else {
+                    pkt = this.script.encode(frame, FRAME_SAMPLES);
+                }
                 if (pkt && pkt.length) out.push(Buffer.from(pkt));
             } catch (e) { /* skip bad frame */ }
             offset += FRAME_BYTES;
@@ -44,10 +68,13 @@ export class OpusDecodeStream {
         this.native = null;
         this.script = null;
         this.decodeFails = 0;
-        try {
-            this.native = new OpusEncoder(SR, CHANNELS);
-        } catch (e) {
-            console.warn("[opus] native decoder unavailable, using opusscript:", e.message);
+        const Native = loadNativeOpusEncoder();
+        if (Native) {
+            try {
+                this.native = new Native(SR, CHANNELS);
+            } catch (e) {
+                console.warn("[opus] native decoder unavailable, using opusscript:", e.message);
+            }
         }
         try {
             this.script = new OpusScript(SR, CHANNELS);

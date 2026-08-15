@@ -29,21 +29,9 @@ impl GatewayProcess {
         if let Ok(p) = which_bin("node") {
             return p;
         }
-        let mut extra = Vec::new();
-        if let Ok(pf) = std::env::var("ProgramFiles") {
-            extra.push(PathBuf::from(pf).join("nodejs").join("node.exe"));
-        }
-        if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
-            extra.push(PathBuf::from(pf86).join("nodejs").join("node.exe"));
-        }
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            extra.push(PathBuf::from(&local).join("Programs").join("nodejs").join("node.exe"));
-            extra.push(PathBuf::from(local).join("fnm_multishells"));
-        }
-        extra.push(PathBuf::from(r"C:\Program Files\nodejs\node.exe"));
-        extra.push(PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"));
-        for p in extra {
+        for p in node_search_paths() {
             if p.is_file() {
+                eprintln!("[gateway] found Node.js at {}", p.display());
                 return p;
             }
         }
@@ -353,10 +341,133 @@ pub fn show_error_dialog(title: &str, msg: &str) {
             .creation_flags(CREATE_NO_WINDOW)
             .status();
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let body = msg.replace('\\', "\\\\").replace('"', "\\\"");
+        let title_e = title.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(
+            r#"display dialog "{body}" with title "{title_e}" buttons {{"OK"}} default button "OK" with icon caution"#
+        );
+        let _ = Command::new("osascript").args(["-e", &script]).status();
+    }
+    #[cfg(all(not(windows), not(target_os = "macos")))]
     {
         eprintln!("{title}: {msg}");
     }
+}
+
+pub fn loading_page_url() -> String {
+    "data:text/html;charset=utf-8,".to_string() + &url_encode_html(r#"<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><title>Loa Ai Agent Bridge</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  font-family:system-ui,sans-serif;background:#0b0f17;color:#e2e8f0}
+  .box{text-align:center;padding:2rem}
+  .spin{width:36px;height:36px;border:3px solid #334155;border-top-color:#3b82f6;
+  border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  h1{font-size:1.1rem;margin:0 0 .35rem}
+  p{margin:0;color:#94a3b8;font-size:.9rem}
+</style></head><body><div class="box">
+<div class="spin"></div><h1>Đang khởi động gateway…</h1>
+<p>Vui lòng đợi vài giây.</p></div></body></html>"#)
+}
+
+pub fn error_page_url(msg: &str) -> String {
+    let safe = html_escape(msg);
+    let log = gateway_log_path().display().to_string();
+    let body = format!(
+        r#"<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><title>Loa Ai Agent Bridge</title>
+<style>
+  body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  font-family:system-ui,sans-serif;background:#0b0f17;color:#e2e8f0;padding:1.5rem}}
+  .box{{max-width:34rem;background:#151d2e;border:1px solid #334155;border-radius:12px;padding:1.5rem}}
+  h1{{font-size:1.05rem;margin:0 0 .75rem;color:#f87171}}
+  pre{{white-space:pre-wrap;word-break:break-word;background:#0a101c;border:1px solid #1e293b;
+  border-radius:8px;padding:.85rem;font-size:.78rem;line-height:1.45;color:#cbd5e1}}
+  ul{{margin:.75rem 0 0;padding-left:1.2rem;color:#94a3b8;font-size:.85rem;line-height:1.55}}
+  code{{background:#0a101c;padding:.1rem .35rem;border-radius:4px}}
+</style></head><body><div class="box">
+<h1>Gateway chưa chạy được</h1>
+<pre>{safe}</pre>
+<ul>
+<li>Cài <b>Node.js 18+</b> từ <code>https://nodejs.org</code> hoặc Homebrew (<code>brew install node</code>).</li>
+<li>Sau khi cài, mở lại app (đóng hẳn icon menu bar → mở lại).</li>
+<li>Log chi tiết: <code>{log}</code></li>
+</ul></div></body></html>"#
+    );
+    "data:text/html;charset=utf-8,".to_string() + &url_encode_html(&body)
+}
+
+fn node_search_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    #[cfg(windows)]
+    {
+        if let Ok(pf) = std::env::var("ProgramFiles") {
+            paths.push(PathBuf::from(pf).join("nodejs").join("node.exe"));
+        }
+        if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+            paths.push(PathBuf::from(pf86).join("nodejs").join("node.exe"));
+        }
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            paths.push(PathBuf::from(&local).join("Programs").join("nodejs").join("node.exe"));
+            let fnm_shells = PathBuf::from(&local).join("fnm_multishells");
+            if fnm_shells.is_dir() {
+                if let Ok(entries) = fs::read_dir(&fnm_shells) {
+                    for entry in entries.flatten() {
+                        paths.push(entry.path().join("node.exe"));
+                    }
+                }
+            }
+        }
+        paths.push(PathBuf::from(r"C:\Program Files\nodejs\node.exe"));
+        paths.push(PathBuf::from(r"C:\Program Files (x86)\nodejs\node.exe"));
+    }
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        paths.push(PathBuf::from("/opt/homebrew/bin/node"));
+        paths.push(PathBuf::from("/usr/local/bin/node"));
+        paths.push(PathBuf::from("/usr/bin/node"));
+        if let Ok(home) = std::env::var("HOME") {
+            let home = PathBuf::from(home);
+            paths.push(home.join(".fnm").join("current").join("bin").join("node"));
+            paths.push(home.join(".volta").join("bin").join("node"));
+            paths.push(home.join(".asdf").join("shims").join("node"));
+            let nvm_versions = home.join(".nvm").join("versions").join("node");
+            if nvm_versions.is_dir() {
+                if let Ok(entries) = fs::read_dir(&nvm_versions) {
+                    let mut vers: Vec<PathBuf> = entries
+                        .filter_map(|e| e.ok())
+                        .map(|e| e.path())
+                        .filter(|p| p.is_dir())
+                        .collect();
+                    vers.sort();
+                    if let Some(latest) = vers.last() {
+                        paths.push(latest.join("bin").join("node"));
+                    }
+                }
+            }
+        }
+    }
+    paths
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn url_encode_html(html: &str) -> String {
+    html.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 fn which_bin(name: &str) -> Result<PathBuf, ()> {

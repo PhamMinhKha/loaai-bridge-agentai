@@ -150,6 +150,9 @@ pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
         .visible(true)
         .on_navigation(move |nav_url| {
             let target = nav_url.as_str();
+            if target.starts_with("data:text/html") {
+                return true;
+            }
             let is_local = target.starts_with("http://127.0.0.1")
                 || target.starts_with("http://localhost")
                 || target.starts_with("https://127.0.0.1")

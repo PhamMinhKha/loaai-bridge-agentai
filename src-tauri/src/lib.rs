@@ -41,14 +41,19 @@ pub fn run() {
                 let gateway = Arc::new(GatewayProcess::new(root, port));
                 app.manage(gateway.clone());
 
+                tray::create_main_window(app.handle(), &gateway::loading_page_url())?;
+
                 match gateway.ensure_running() {
                     Ok(()) => {
-                        open_app_window(app.handle(), &gateway)?;
+                        tray::navigate_main_window(app.handle(), &gateway.app_url());
                     }
                     Err(e) => {
                         eprintln!("[gateway] {e}");
                         gateway::show_error_dialog("Loa Ai Agent Bridge", &e);
-                        open_app_window(app.handle(), &gateway)?;
+                        tray::navigate_main_window(
+                            app.handle(),
+                            &gateway::error_page_url(&e),
+                        );
                         schedule_webview_reload(app.handle().clone(), gateway.clone());
                     }
                 }
@@ -65,10 +70,6 @@ pub fn run() {
                 }
             }
         });
-}
-
-fn open_app_window(app: &tauri::AppHandle, gateway: &SharedGateway) -> tauri::Result<()> {
-    tray::create_main_window(app, &gateway.app_url())
 }
 
 fn schedule_webview_reload(app: tauri::AppHandle, gateway: SharedGateway) {

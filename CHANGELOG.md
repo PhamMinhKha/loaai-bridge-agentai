@@ -68,6 +68,11 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Fixed
+- **macOS build màn hình trắng**: app mở từ Finder không thấy Node (PATH GUI thiếu nvm/Homebrew) —
+  tìm Node tại `/opt/homebrew/bin`, `/usr/local/bin`, nvm/fnm/volta/asdf; trang loading/lỗi
+  thay vì WebView trống; dialog lỗi qua `osascript` khi gateway fail.
+- **`@discordjs/opus` crash bản desktop**: lazy-load native addon, fallback `opusscript` khi ABI Node
+  không khớp (Homebrew vs nvm lúc build).
 - **MSI cài xong không mở được UI**: Node crash với path `\\?\C:\Program Files\...` (EISDIR) —
   strip prefix extended path trước khi spawn; tìm Node tại `Program Files\nodejs` nếu PATH thiếu.
 - **WebView ERR_UNSAFE_PORT** khi dùng port 6000 (Chromium chặn port X11) — chuyển mặc định sang 8888.
@@ -116,6 +121,8 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - **TTS mặc định** `edge` (Edge TTS, giọng `vi-VN-HoaiMyNeural`) thay vì `none` / `pyttsx3`.
 - **Web UI**: placeholder device token hiển thị mặc định; ẩn card **Bảo mật WSS (LAN)** khi dùng Cloudflare Tunnel.
 - **Desktop Tauri**: cửa sổ chính **1024×880** (trước 900×780).
+- **Desktop macOS**: mở cửa sổ với trang loading trước, navigate sang gateway khi `/health` sẵn sàng;
+  feature `webview-data-url` cho trang lỗi nội bộ.
 
 ## [Initial] — ESP32-S3 xiaozhi protocol
 - Dual flow (audio Opus/PCM + text), 2-tab web test bench, Opus codec,
