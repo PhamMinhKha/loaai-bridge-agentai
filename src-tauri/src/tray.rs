@@ -145,7 +145,7 @@ pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
     let app_handle = app.clone();
     let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse().unwrap()))
         .title(APP_TITLE)
-        .inner_size(900.0, 780.0)
+        .inner_size(1024.0, 880.0)
         .resizable(true)
         .visible(true)
         .on_navigation(move |nav_url| {

@@ -110,6 +110,13 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - Gateway cũ chiếm port 8888 khiến UI báo "Server trả HTML" — detect qua `apiVersion` và restart.
 - Spawn `cloudflared` với đường dẫn có khoảng trắng (`Program Files (x86)`).
 
+### Changed (defaults & UX)
+- **Device token mặc định** cố định `helloloaai` thay vì random mỗi lần bật internet
+  (`DEFAULT_DEVICE_TOKEN` trong `serverControl.js`, dùng chung cho tunnel/ESP32).
+- **TTS mặc định** `edge` (Edge TTS, giọng `vi-VN-HoaiMyNeural`) thay vì `none` / `pyttsx3`.
+- **Web UI**: placeholder device token hiển thị mặc định; ẩn card **Bảo mật WSS (LAN)** khi dùng Cloudflare Tunnel.
+- **Desktop Tauri**: cửa sổ chính **1024×880** (trước 900×780).
+
 ## [Initial] — ESP32-S3 xiaozhi protocol
 - Dual flow (audio Opus/PCM + text), 2-tab web test bench, Opus codec,
   venv311 Whisper fix.

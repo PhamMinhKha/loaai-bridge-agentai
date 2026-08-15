@@ -789,7 +789,7 @@ HERMES_URL=http://127.0.0.1:8642</code></div>
         </div>
         <div class="full">
           <label for="inpPublicToken">Device token (ESP32 hello.token)</label>
-          <input type="text" id="inpPublicToken" placeholder="Tự tạo khi bật nếu để trống" autocomplete="off" spellcheck="false" />
+          <input type="text" id="inpPublicToken" placeholder="helloloaai (mặc định khi để trống)" autocomplete="off" spellcheck="false" />
         </div>
         <div class="full">
           <label>Trình duyệt</label>
@@ -815,7 +815,7 @@ HERMES_URL=http://127.0.0.1:8642</code></div>
         Nhập hostname → bấm <b>Áp dụng</b> → app tự mở hướng dẫn và chạy tunnel (chỉ cần đăng nhập Cloudflare một lần trong trình duyệt).
       </p>
     </div>
-    <div class="card">
+    <div class="card hidden" id="settingsTlsCard" aria-hidden="true">
       <h2 class="card-title">Bảo mật WSS (LAN)</h2>
       <p class="card-desc">Bật HTTPS/WSS cho ESP32 và thiết bị trong mạng LAN. Máy local (Tauri/trình duyệt) vẫn dùng <code>ws://127.0.0.1</code>.</p>
       <label class="check-row full" style="margin:.5rem 0 .75rem">

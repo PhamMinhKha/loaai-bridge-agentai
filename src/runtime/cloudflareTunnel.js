@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parsePublicHostname } from "./serverControl.js";
+import { DEFAULT_DEVICE_TOKEN, parsePublicHostname } from "./serverControl.js";
 import { upsertEnvFile, VG_ENV } from "./envFile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -606,7 +606,7 @@ export async function setupTunnelFull({
     const host = parsePublicHostname(hostname);
     const esp32 = buildEsp32HelloConfig({
         hostname: host,
-        token: deviceToken || process.env.DEVICE_TOKEN_SECRET || ""
+        token: deviceToken || process.env.DEVICE_TOKEN_SECRET || DEFAULT_DEVICE_TOKEN
     });
 
     return {

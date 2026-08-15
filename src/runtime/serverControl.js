@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -47,8 +46,10 @@ function publicEnabledFromEnv() {
     return process.env.PUBLIC_ENABLED === "true" || config.publicEnabled === true;
 }
 
+export const DEFAULT_DEVICE_TOKEN = "helloloaai";
+
 function newDeviceToken() {
-    return randomBytes(24).toString("base64url");
+    return DEFAULT_DEVICE_TOKEN;
 }
 
 export function getServerInfo({ includeSecrets = false } = {}) {

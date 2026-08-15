@@ -44,7 +44,7 @@ export const config = {
     },
 
     tts: {
-        provider: process.env.TTS_PROVIDER || "none",
+        provider: process.env.TTS_PROVIDER || "edge",
         apiKey: process.env.TTS_API_KEY,
         voice: process.env.TTS_VOICE || "vi-VN-HoaiMyNeural",
         python: process.env.TTS_PYTHON || "python",
