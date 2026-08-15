@@ -4,7 +4,7 @@
 
 ```
 ESP32 (Opus) ─┐
-              ├─► WebSocket /ws ─► Voice Gateway ─► Whisper (Python)
+              ├─► WebSocket /ws ─► Loa Ai Agent Bridge ─► Whisper (Python)
 Trình duyệt ──┘         │                              │
   (PCM 16k)             │                              ▼
                         │                         Agent (mock / OpenClaw / Hermes)

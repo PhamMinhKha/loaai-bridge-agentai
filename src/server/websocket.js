@@ -7,6 +7,7 @@ import { playTtsNative } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 import { sendJson } from "../runtime/log.js";
 import { saveSttDump } from "../runtime/sttDump.js";
+import { saveConversation, attachConversationReply } from "../runtime/conversationHistory.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
 import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
@@ -41,6 +42,7 @@ export function createWebSocketServer(server, opts = {}) {
         let partialTimer = null;
         let voiceStarted = false;
         let prefs = { ...getPrefs() };
+        let pendingConvId = null;
 
         const send = (obj) => sendJson(socket, obj, "ws");
 
@@ -101,7 +103,15 @@ export function createWebSocketServer(server, opts = {}) {
                     source: "ws",
                     sttMs
                 });
+                pendingConvId = null;
                 if (text) {
+                    pendingConvId = saveConversation({
+                        text,
+                        pcm: stt.lastPcm,
+                        deviceId,
+                        source: "ws",
+                        sttMs
+                    });
                     const ok = send(msg.transcript(text, { sttMs }));
                     console.log("[stt] transcript → client:", ok ? "yes" : "NO");
                     await handleTextCommand(text);
@@ -153,10 +163,14 @@ export function createWebSocketServer(server, opts = {}) {
                 if (error) {
                     send(msg.error("AGENT_ERROR", error));
                     mirrorChatToTelegram({ user: text, error });
+                    attachConversationReply(pendingConvId, "", error);
+                    pendingConvId = null;
                     return;
                 }
                 send(msg.agentMessage(reply, session.sessionId));
                 mirrorChatToTelegram({ user: text, assistant: reply });
+                attachConversationReply(pendingConvId, reply);
+                pendingConvId = null;
                 try { await playTtsNative(socket, tts, reply); }
                 catch (e) { console.error("[tts]", e.message); }
             };
@@ -169,6 +183,8 @@ export function createWebSocketServer(server, opts = {}) {
                     mirrorChatToTelegram({ user: text, running: true });
                 } else {
                     mirrorChatToTelegram({ user: text, assistant: reply });
+                    attachConversationReply(pendingConvId, reply);
+                    pendingConvId = null;
                 }
                 try {
                     await playTtsNative(socket, tts, reply);
@@ -176,6 +192,8 @@ export function createWebSocketServer(server, opts = {}) {
             } catch (e) {
                 send(msg.error("AGENT_ERROR", e.message));
                 mirrorChatToTelegram({ user: text, error: e.message });
+                attachConversationReply(pendingConvId, "", e.message);
+                pendingConvId = null;
             }
             send(msg.state("listening"));
             armListen();

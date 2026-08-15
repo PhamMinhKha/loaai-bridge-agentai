@@ -1,7 +1,7 @@
 {
   "name": "voice-gateway",
   "version": "1.0.0",
-  "description": "Node.js Voice Gateway for ESP32 <-> OpenClaw/Hermes",
+  "description": "Loa Ai Agent Bridge — ESP32 / browser ↔ STT ↔ OpenClaw/Hermes ↔ TTS",
   "type": "module",
   "scripts": {
     "setup:dev": "node scripts/setup-dev.js",

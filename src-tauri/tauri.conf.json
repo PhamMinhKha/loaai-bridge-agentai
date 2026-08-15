@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voice Gateway",
+  "productName": "Loa Ai Agent Bridge",
   "version": "1.0.0",
   "identifier": "com.voicegateway.app",
   "build": {

@@ -8,7 +8,7 @@ export class MockAdapter extends Agent {
             return { text: "Hôm nay trời nắng đẹp, nhiệt độ khoảng 29 độ C." };
         }
         if (/bạn là ai/i.test(t)) {
-            return { text: "Tôi là Voice Gateway demo, chạy qua agent mock." };
+            return { text: "Tôi là Loa Ai Agent Bridge demo, chạy qua agent mock." };
         }
         return { text: `Bạn vừa nói: "${t}"` };
     }

@@ -1,7 +1,7 @@
-# Hướng dẫn cấu hình ESP32-S3 kết nối Voice Gateway
+# Hướng dẫn cấu hình ESP32-S3 kết nối Loa Ai Agent Bridge
 
 Hướng dẫn code firmware ESP32-S3 (board `esp-vocat`, firmware `xiaozhi-esp32`) để
-nói chuyện với **Voice Gateway** chạy trên PC (Windows). Gateway xử lý STT → Agent
+nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge xử lý STT → Agent
 → TTS, ESP32 chỉ lo thu phát audio + giao tiếp WebSocket.
 
 ---
@@ -38,7 +38,7 @@ nói chuyện với **Voice Gateway** chạy trên PC (Windows). Gateway xử l�
 
 ### 2.1 WSS (bảo mật LAN)
 
-1. Mở Voice Gateway → tab **Cài đặt** → bật **WSS cho LAN** → restart.
+1. Mở Loa Ai Agent Bridge → tab **Cài đặt** → bật **WSS cho LAN** → restart.
 2. ESP32 dùng `wss://<PC_IP>:3000/ws` thay `ws://`.
 3. **Tự nhận cert (khuyến nghị)** — không cần embed vào firmware:
    - Lần đầu: kết nối WSS với **bỏ qua verify cert** (insecure / `setInsecure()`).
@@ -207,7 +207,7 @@ PARTIAL_ENABLED=false           # STT từng phần (tắt để giảm latency)
 cd D:\voice-gateway
 npm install
 node src/index.js
-# log: "Voice Gateway listening on :3000 (agent=mock)"
+# log: "Loa Ai Agent Bridge listening on :3000 (agent=mock)"
 ```
 
 ### ESP32 (flash)

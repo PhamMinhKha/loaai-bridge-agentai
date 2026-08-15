@@ -5,6 +5,7 @@ import { playTtsXiaozhi } from "../audio/ttsPlayback.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 import { sendJson } from "../runtime/log.js";
 import { saveSttDump } from "../runtime/sttDump.js";
+import { saveConversation, attachConversationReply } from "../runtime/conversationHistory.js";
 import { acceptSttText } from "../runtime/sttFilter.js";
 import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
@@ -37,6 +38,7 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
     let holdIdle = false;
     let codec = (initialFormat === "pcm") ? "pcm" : "opus";
     let prefs = { ...initialPrefs };
+    let pendingConvId = null;
     const opusDec = new OpusDecodeStream();
     const opusEnc = new OpusEncodeStream();
 
@@ -91,7 +93,15 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
                 source: "xiaozhi",
                 sttMs
             });
+            pendingConvId = null;
             if (text) {
+                pendingConvId = saveConversation({
+                    text,
+                    pcm: stt.lastPcm,
+                    deviceId,
+                    source: "xiaozhi",
+                    sttMs
+                });
                 const ok = send({ type: "stt", text, sttMs });
                 console.log("[xiaozhi-stt] transcript → client:", ok ? "yes" : "NO");
                 await handleTextCommand(text);
@@ -135,10 +145,14 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
             if (error) {
                 send({ type: "error", code: "AGENT_ERROR", message: error });
                 mirrorChatToTelegram({ user: text, error });
+                attachConversationReply(pendingConvId, "", error);
+                pendingConvId = null;
                 return;
             }
             send({ type: "llm", text: reply, emotion: "neutral" });
             mirrorChatToTelegram({ user: text, assistant: reply });
+            attachConversationReply(pendingConvId, reply);
+            pendingConvId = null;
             try {
                 await playTtsXiaozhi(socket, tts, reply, { codec, opusEnc });
             } catch (e) { console.error("[xiaozhi-tts]", e.message); }
@@ -152,6 +166,8 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
                 mirrorChatToTelegram({ user: text, running: true });
             } else {
                 mirrorChatToTelegram({ user: text, assistant: reply });
+                attachConversationReply(pendingConvId, reply);
+                pendingConvId = null;
             }
             try {
                 await playTtsXiaozhi(socket, tts, reply, { codec, opusEnc });
@@ -160,6 +176,8 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
             console.error("[xiaozhi-agent]", e.message);
             send({ type: "error", code: "AGENT_ERROR", message: e.message });
             mirrorChatToTelegram({ user: text, error: e.message });
+            attachConversationReply(pendingConvId, "", e.message);
+            pendingConvId = null;
         }
         send({ type: "state", state: "listening" });
         armListen();

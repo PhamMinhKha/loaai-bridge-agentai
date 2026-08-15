@@ -1,4 +1,4 @@
-# TODO — bổ sung Voice Gateway
+# TODO — bổ sung Loa Ai Agent Bridge
 
 Cập nhật sau khi làm P0 trong code. Mục **Test thật** (máy có Edge/OpenClaw/Hermes chạy) vẫn để trống cho bạn tick khi thử.
 
@@ -98,7 +98,7 @@ Cập nhật sau khi làm P0 trong code. Mục **Test thật** (máy có Edge/Op
 
 ## P2 — App desktop (Windows + macOS)
 
-Chuyển Voice Gateway từ Node server + trình duyệt thành **app desktop**, chạy nền; khi người dùng đóng cửa sổ thì **không thoát**, chỉ thu vào **khay hệ thống** (Windows: system tray / notification area; macOS: menu bar).
+Chuyển Loa Ai Agent Bridge từ Node server + trình duyệt thành **app desktop**, chạy nền; khi người dùng đóng cửa sổ thì **không thoát**, chỉ thu vào **khay hệ thống** (Windows: system tray / notification area; macOS: menu bar).
 
 - [x] Chọn stack **Tauri** bọc `src/index.js` + UI `public/`
 - [x] Đóng cửa sổ = ẩn, process gateway vẫn listen (HTTP/WS port)

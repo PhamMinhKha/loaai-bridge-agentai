@@ -1,17 +1,45 @@
-# Changelog — Voice Gateway
+# Changelog — Loa Ai Agent Bridge
 
 Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 
-## [Unreleased] — 2026-08-14
+## [Unreleased] — 2026-08-15
+
+### Changed
+- Đổi tên hiển thị app thành **Loa Ai Agent Bridge** (title bar, tray, web UI, docs, cert TLS, log server, Telegram mirror).
+- **Web UI** tái cấu trúc đa tab: Giọng nói, Chat, Cấu hình, Thiết lập, ESP32, Thông tin, Cài đặt;
+  header giao diện hiển thị **Loa Ai Agent Bridge** (phiên bản ở tab Thông tin).
+- **macOS desktop**: icon menu bar template (`trayTemplate.png`); đóng cửa sổ → ẩn Dock (chỉ còn menu bar), mở lại → hiện Dock.
+- Tab **Thông tin**: sơ đồ luồng **Loa Ai → Agent Bridge → Agent** (OpenClaw/Hermes/Mock) đổi theo agent đang chọn.
+- Nút **Kết nối OpenClaw** dùng logo SVG thay emoji tia sét.
+- Cài đặt port: badge **TCP** trên, **Port** và ô nhập cùng hàng, dải `1024 – 65535` bên dưới.
+- Chụp màn hình: hỗ trợ Windows PowerShell tốt hơn (`scripts/screenshot.ps1`, `screenshot.js`).
+- Whisper: `vad_filter`, `condition_on_previous_text=false`, `no_speech_threshold=0.6`
+  để giảm ảo giác khi im lặng/nhiễu.
+- `pause` thật sự giữ idle (bỏ audio) đến `audio_start`.
+- **VAD chống pop mic**: bỏ ~900ms audio sau khi arm listen (`WARMUP_MS`);
+  cần ~6 frame RMS cao liên tiếp (`HOT_FRAMES`) mới coi là bắt đầu nói.
+  Ngưỡng `VOICE_ENERGY` giữ 200.
+- Message `pause` → `idle` (reset STT/VAD), chờ `audio_start` mới nghe lại.
+- Bỏ `audio_end` nếu chưa có tiếng (`voiceStarted`), tránh cắt phiên ảo.
+- **Decode Opus ưu tiên native `@discordjs/opus`**, fallback `opusscript` nếu native lỗi;
+  chuẩn hoá PCM về Buffer s16le (`src/audio/opusCodec.js`).
+- **Giữ `listening`** khi hết `LISTEN_MS`, STT trống, STT lỗi, hoặc vừa hello;
+  timeout chỉ reset STT rồi arm lại vòng nghe (không đẩy `idle`).
+- Xử lý `audio_start`: reset STT/VAD, warmup và quay lại `listening`.
+- Flow Text (tab 2) quay về `listening` sau khi trả lời xong, giữ vòng hội thoại.
+- Cập nhật agents (`hermes.js`, `openclaw.js`), `audioManager.js`, `config.js`,
+  `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
 
 ### Added
 - **Ứng dụng desktop Tauri 2** (`src-tauri/`, `npm run tauri:dev` / `tauri:build`): chạy gateway Node
-  bundled, tray icon, đóng cửa sổ → ẩn vào tray, title bar `Voice Gateway v… - LoaAi.me`.
+  bundled, tray icon, đóng cửa sổ → ẩn vào tray, title bar `Loa Ai Agent Bridge v… - LoaAi.me`.
 - **Icon app** tùy chỉnh (microphone + gateway, bo góc Dock macOS) — nguồn `scripts/app-icon.svg`,
   sinh `icon.icns` / `icon.ico` / favicon.
 - Tab **ℹ️ Thông tin**: nguồn gốc Loa Ai, vai trò cầu nối OpenClaw/Hermes, nút mở [LoaAi.me](https://loaai.me).
 - Tab **⚙ Cài đặt**: theme sáng/tối, đổi port TCP (1024–65535), **WSS/TLS LAN** cho ESP32,
   toggle **khởi động cùng hệ thống** (desktop + menu tray).
+- **Lịch sử giọng nói** (50 cuộc gần nhất, Web + ESP32): lưu WAV gốc, nghe/tải lại trên tab Giọng nói;
+  API `GET /api/conversations`, `GET /api/conversations/:id/audio` (`src/runtime/conversationHistory.js`).
 - API mới: `GET /health` (version), `GET /api/server`, `POST /api/server/restart`,
   `GET /api/tls/info`, `GET /api/tls/cert`.
 - TLS/WSS tự ký cho LAN (`src/runtime/tlsSetup.js`, `selfsigned`); localhost vẫn HTTP/WS.
@@ -33,28 +61,6 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - File `.env.example`, `SETUP.md`, `requirements.txt`, `doc/`, `scripts/setup-dev.*`
   và các module runtime mới (`src/runtime/`, `src/audio/ttsPlayback.js`,
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
-
-### Changed
-- **Web UI** tái cấu trúc đa tab: Giọng nói, Chat, Cấu hình, Thiết lập, ESP32, Thông tin, Cài đặt;
-  header giao diện chỉ hiển thị **Voice Gateway** (phiên bản ở tab Thông tin).
-- Cài đặt port: badge **TCP** trên, **Port** và ô nhập cùng hàng, dải `1024 – 65535` bên dưới.
-- Chụp màn hình: hỗ trợ Windows PowerShell tốt hơn (`scripts/screenshot.ps1`, `screenshot.js`).
-- Whisper: `vad_filter`, `condition_on_previous_text=false`, `no_speech_threshold=0.6`
-  để giảm ảo giác khi im lặng/nhiễu.
-- `pause` thật sự giữ idle (bỏ audio) đến `audio_start`.
-- **VAD chống pop mic**: bỏ ~900ms audio sau khi arm listen (`WARMUP_MS`);
-  cần ~6 frame RMS cao liên tiếp (`HOT_FRAMES`) mới coi là bắt đầu nói.
-  Ngưỡng `VOICE_ENERGY` giữ 200.
-- Message `pause` → `idle` (reset STT/VAD), chờ `audio_start` mới nghe lại.
-- Bỏ `audio_end` nếu chưa có tiếng (`voiceStarted`), tránh cắt phiên ảo.
-- **Decode Opus ưu tiên native `@discordjs/opus`**, fallback `opusscript` nếu native lỗi;
-  chuẩn hoá PCM về Buffer s16le (`src/audio/opusCodec.js`).
-- **Giữ `listening`** khi hết `LISTEN_MS`, STT trống, STT lỗi, hoặc vừa hello;
-  timeout chỉ reset STT rồi arm lại vòng nghe (không đẩy `idle`).
-- Xử lý `audio_start`: reset STT/VAD, warmup và quay lại `listening`.
-- Flow Text (tab 2) quay về `listening` sau khi trả lời xong, giữ vòng hội thoại.
-- Cập nhật agents (`hermes.js`, `openclaw.js`), `audioManager.js`, `config.js`,
-  `index.js` để hỗ trợ dual-flow audio (Opus/PCM) + text và 2-tab web test bench.
 
 ### Fixed
 - Nút/link **Mở LoaAi.me**: chữ trắng trên nền xanh, mở URL qua Tauri shell thay vì bị chặn webview.

@@ -1,6 +1,6 @@
-# Setup — Voice Gateway
+# Setup — Loa Ai Agent Bridge
 
-Gateway Node.js: ESP32 / trình duyệt ↔ STT (Whisper) ↔ Agent (mock / OpenClaw / Hermes) ↔ TTS.
+Gateway Node.js (**Loa Ai Agent Bridge**): ESP32 / trình duyệt ↔ STT (Whisper) ↔ Agent (mock / OpenClaw / Hermes) ↔ TTS.
 
 ## Yêu cầu
 
@@ -110,7 +110,7 @@ npm run tauri:build  # đóng gói .dmg (macOS) / .exe (Windows)
 ```
 
 - Đóng cửa sổ → ẩn vào tray (Windows) / menu bar (macOS); gateway vẫn chạy nền.
-- Tray / menu bar → **Mở Voice Gateway** / bật **Khởi động cùng Windows** hoặc **Launch at login** / **Thoát**.
+- Tray / menu bar → **Mở Loa Ai Agent Bridge** / bật **Khởi động cùng Windows** hoặc **Launch at login** / **Thoát**.
 - Tab **Cài đặt** (app desktop): toggle autostart, đổi port, WSS LAN.
 - UI in-app: tab **Setup & Kiểm tra** (Tự setup, Hermes, diagnostics), chọn STT Whisper/OpenAI, test mic tab Flow 1.
 - Build production cần Node cài trên máy người dùng (bundle Node sidecar: P2).

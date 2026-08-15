@@ -1,4 +1,4 @@
-# Cài môi trường development Voice Gateway (Windows PowerShell).
+# Cài môi trường development Loa Ai Agent Bridge (Windows PowerShell).
 $ErrorActionPreference = "Stop"
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path

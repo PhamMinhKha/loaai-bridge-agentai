@@ -52,7 +52,7 @@ function generateWithOpenssl(sans, certPath, keyPath) {
         if (/^\d+\.\d+\.\d+\.\d+$/.test(name)) return [`IP:${name}`];
         return [`DNS:${name}`];
     });
-    const subj = "/CN=Voice Gateway";
+    const subj = "/CN=Loa Ai Agent Bridge";
     const gen = spawnSync(
         "openssl",
         [
@@ -75,7 +75,7 @@ async function generateWithSelfsigned(sans, certPath, keyPath) {
         return { type: 2, value: name };
     });
     const pems = await selfsigned.generate(
-        [{ name: "commonName", value: "Voice Gateway" }],
+        [{ name: "commonName", value: "Loa Ai Agent Bridge" }],
         {
             days: 825,
             keySize: 2048,

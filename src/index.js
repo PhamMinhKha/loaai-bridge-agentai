@@ -14,6 +14,7 @@ import { runDevSetup } from "./runtime/devSetup.js";
 import { runDiagnostics } from "./runtime/diagnostics.js";
 import { getServerInfo, restartGateway } from "./runtime/serverControl.js";
 import { getLanAddresses, loadTlsOptions, readPublicCertInfo, isTlsEnabled } from "./runtime/tlsSetup.js";
+import { listConversations, getConversationAudioPath } from "./runtime/conversationHistory.js";
 
 const app = express();
 app.use(express.json());
@@ -24,7 +25,7 @@ app.get("/health", async (req, res) => {
         const server = getServerInfo();
         res.json({
             ok: true,
-            service: "voice-gateway",
+            service: "loa-ai-agent-bridge",
             version: pkg.version,
             port: server.port,
             host: config.host,
@@ -157,6 +158,24 @@ app.post("/api/server/restart", (req, res) => {
     }
 });
 
+app.get("/api/conversations", (req, res) => {
+    try {
+        res.json({ ok: true, items: listConversations() });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+app.get("/api/conversations/:id/audio", (req, res) => {
+    try {
+        const file = getConversationAudioPath(req.params.id);
+        if (!file) return res.status(404).json({ ok: false, error: "Không tìm thấy audio" });
+        res.download(file, `${req.params.id}.wav`);
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
@@ -180,14 +199,14 @@ if (tlsEnabled) {
     createWebSocketServer(httpsServer, wsOpts);
 
     httpServer.listen(port, "127.0.0.1", () => {
-        console.log(`Voice Gateway local HTTP on 127.0.0.1:${port} (agent=${p.agent} tts=${p.tts})`);
+        console.log(`Loa Ai Agent Bridge local HTTP on 127.0.0.1:${port} (agent=${p.agent} tts=${p.tts})`);
         console.log(`  local:  http://127.0.0.1:${port}/`);
         console.log(`  ws:     ws://127.0.0.1:${port}/ws`);
     });
 
     httpsServer.listen(port, "0.0.0.0", () => {
         const lanIps = getLanAddresses();
-        console.log(`Voice Gateway LAN HTTPS/WSS on 0.0.0.0:${port}`);
+        console.log(`Loa Ai Agent Bridge LAN HTTPS/WSS on 0.0.0.0:${port}`);
         console.log(`  cert:   ${tls.certPath}`);
         if (lanIps.length) {
             for (const ip of lanIps) {
@@ -201,7 +220,7 @@ if (tlsEnabled) {
     const server = http.createServer(app);
     createWebSocketServer(server, wsOpts);
     server.listen(port, config.host, () => {
-        console.log(`Voice Gateway listening on ${config.host}:${port} (agent=${p.agent} tts=${p.tts})`);
+        console.log(`Loa Ai Agent Bridge listening on ${config.host}:${port} (agent=${p.agent} tts=${p.tts})`);
         console.log(`  local:  http://127.0.0.1:${port}/`);
         console.log(`  LAN:    http://<IP-PC>:${port}/   (máy khác cùng Wi‑Fi/LAN)`);
     });

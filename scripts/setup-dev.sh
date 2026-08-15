@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cài môi trường development Voice Gateway (macOS / Linux).
+# Cài môi trường development Loa Ai Agent Bridge (macOS / Linux).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

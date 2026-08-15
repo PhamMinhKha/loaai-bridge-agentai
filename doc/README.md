@@ -1,4 +1,4 @@
-# Voice Gateway — tài liệu luồng hoạt động
+# Loa Ai Agent Bridge — tài liệu luồng hoạt động
 
 Gateway Node.js đứng giữa thiết bị thoại (ESP32 / trình duyệt) và pipeline **STT → Agent → TTS**.
 

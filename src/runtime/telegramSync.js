@@ -21,7 +21,7 @@ function escapeHtml(s) {
 function formatTurn({ user, assistant, error, running }) {
     const u = escapeHtml(clip(user, 1200));
     const lines = [
-        "🎤 <b>Voice Gateway</b>",
+        "🎤 <b>Loa Ai Agent Bridge</b>",
         "",
         "🟠 <b>Bạn hỏi</b>",
         `<blockquote>${u}</blockquote>`,

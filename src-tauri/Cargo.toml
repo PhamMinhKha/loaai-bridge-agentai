@@ -1,8 +1,8 @@
 [package]
 name = "voice-gateway-app"
 version = "1.0.0"
-description = "Voice Gateway Desktop App"
-authors = ["Voice Gateway"]
+description = "Loa Ai Agent Bridge Desktop App"
+authors = ["LoaAi.me"]
 edition = "2021"
 
 [build-dependencies]
