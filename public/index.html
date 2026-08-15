@@ -141,6 +141,73 @@
   }
   .card + .card { margin-top: 1rem; }
   .card-title { font-size: .95rem; font-weight: 600; margin: 0 0 .35rem; }
+  .card-title-row {
+    display: flex; align-items: center; gap: .45rem; margin: 0 0 .35rem;
+  }
+  .card-title-row .card-title { margin: 0; flex: 1; }
+  .help-btn {
+    flex-shrink: 0;
+    width: 1.35rem; height: 1.35rem; padding: 0;
+    border-radius: 50%; border: 1px solid var(--border-strong);
+    background: var(--bg-input); color: var(--text-muted);
+    font-size: .72rem; font-weight: 700; line-height: 1;
+    cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+  }
+  .help-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-elevated); }
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.55); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; opacity: 0; visibility: hidden;
+    transition: opacity .2s, visibility .2s;
+  }
+  .modal-overlay.open { opacity: 1; visibility: visible; }
+  .modal-box {
+    width: min(32rem, 100%); max-height: min(85vh, 640px);
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
+    padding: 1rem 1.1rem .65rem; border-bottom: 1px solid var(--border);
+  }
+  .modal-head h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .modal-close {
+    flex-shrink: 0; width: 1.75rem; height: 1.75rem; padding: 0;
+    border: 0; border-radius: var(--radius-sm);
+    background: transparent; color: var(--text-muted); font-size: 1.25rem; line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close:hover { background: var(--bg-input); color: var(--text); }
+  .modal-body {
+    padding: .85rem 1.1rem 1rem; overflow-y: auto;
+    font-size: .82rem; color: var(--text-muted); line-height: 1.55;
+  }
+  .modal-body ol { margin: .5rem 0; padding-left: 1.2rem; }
+  .modal-body li { margin: .45rem 0; }
+  .modal-body code, .modal-body .code-inline {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: .76rem; background: var(--code-bg); color: var(--text);
+    padding: .1rem .35rem; border-radius: 4px;
+  }
+  .modal-body pre {
+    margin: .4rem 0 .65rem; padding: .65rem .75rem;
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); overflow-x: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: .72rem; line-height: 1.45; color: #e2e8f0;
+  }
+  .modal-note {
+    margin-top: .75rem; padding: .55rem .65rem;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-elevated); font-size: .78rem;
+  }
+  .modal-foot {
+    padding: .65rem 1.1rem 1rem; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: .5rem;
+  }
+  .modal-tunnel-form { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .65rem .75rem; }
   .card-desc { font-size: .82rem; color: var(--text-muted); margin: 0 0 1rem; }
 
   /* Forms */
@@ -277,6 +344,8 @@
   .btn-teal { background: #0d9488; color: #fff; }
   .btn-amber { background: #d97706; color: #fff; }
   .btn-orange { background: #ea580c; color: #fff; }
+  .btn-openclaw { background: #7dd3fc; color: #0c4a6e; }
+  .btn-openclaw:hover:not(:disabled) { background: #38bdf8; }
   .agent-actions { margin-top: .25rem; }
 
   /* Log */
@@ -486,8 +555,8 @@
     <button class="nav-btn" id="tabConfig" role="tab">🔧 Cấu hình</button>
     <button class="nav-btn" id="tabSetup" role="tab">⚡ Thiết lập</button>
     <button class="nav-btn" id="tabEsp" role="tab">📡 ESP32</button>
-    <button class="nav-btn" id="tabInfo" role="tab">ℹ️ Thông tin</button>
     <button class="nav-btn" id="tabSettings" role="tab">⚙ Cài đặt</button>
+    <button class="nav-btn" id="tabInfo" role="tab">ℹ️ Thông tin</button>
   </nav>
 
   <!-- TAB: Giọng nói -->
@@ -584,10 +653,11 @@
         <li><b>Kết nối Agent</b> — OpenClaw hoặc Hermes (nút bên dưới)</li>
         <li><b>Chọn Agent/STT</b> — tab Cấu hình</li>
         <li><b>Test mic</b> — tab Giọng nói</li>
+        <li><b>Domain internet</b> — tab <b>Cài đặt</b> → Internet (domain công khai)</li>
       </ol>
       <div class="btn-row">
         <button class="btn-teal" id="setupDev">⚡ Tự setup</button>
-        <button class="btn-orange btn-icon" id="setupOpenclawTab"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="ocTab" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ff6b5a"/><stop offset="100%" stop-color="#d4183d"/></linearGradient></defs><ellipse cx="60" cy="72" rx="38" ry="32" fill="url(#ocTab)"/><ellipse cx="28" cy="78" rx="12" ry="16" fill="#e8344a"/><ellipse cx="92" cy="78" rx="12" ry="16" fill="#e8344a"/><path d="M48 42 Q44 24 40 18" stroke="#c41230" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M72 42 Q76 24 80 18" stroke="#c41230" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="48" cy="58" r="8" fill="#1a1a2e"/><circle cx="72" cy="58" r="8" fill="#1a1a2e"/><circle cx="50" cy="58" r="3" fill="#22d3ee"/><circle cx="74" cy="58" r="3" fill="#22d3ee"/></svg> Kết nối OpenClaw</button>
+        <button class="btn-openclaw btn-icon" id="setupOpenclawTab"><svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="ocTab" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ff6b5a"/><stop offset="100%" stop-color="#d4183d"/></linearGradient></defs><ellipse cx="60" cy="72" rx="38" ry="32" fill="url(#ocTab)"/><ellipse cx="28" cy="78" rx="12" ry="16" fill="#e8344a"/><ellipse cx="92" cy="78" rx="12" ry="16" fill="#e8344a"/><path d="M48 42 Q44 24 40 18" stroke="#c41230" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M72 42 Q76 24 80 18" stroke="#c41230" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="48" cy="58" r="8" fill="#1a1a2e"/><circle cx="72" cy="58" r="8" fill="#1a1a2e"/><circle cx="50" cy="58" r="3" fill="#22d3ee"/><circle cx="74" cy="58" r="3" fill="#22d3ee"/></svg> Kết nối OpenClaw</button>
         <button class="btn-purple" id="setupHermes">⚡ Setup Hermes API</button>
         <button class="btn-amber" id="runDiag">🔍 Kiểm tra lỗi</button>
       </div>
@@ -608,13 +678,18 @@
         <input type="text" id="wsUrl" readonly />
         <button class="copybtn" id="copyWs">Copy</button>
       </div>
+      <p class="card-desc" style="margin-top:.65rem;margin-bottom:.35rem">Internet (Cloudflare Named Tunnel): <code>wss://voice.yourdomain.com/ws</code> — hostname cố định. Tắt WSS tự ký, <code>HOST=127.0.0.1</code>, bật <code>REQUIRE_DEVICE_TOKEN</code>. Không dùng <code>*.trycloudflare.com</code> (đổi mỗi lần chạy).</p>
+      <label class="port-label" for="inpDeviceToken">Device token (hello.token)</label>
+      <div class="urlrow" style="margin-top:.35rem">
+        <input type="password" id="inpDeviceToken" placeholder="DEVICE_TOKEN_SECRET — bắt buộc khi mở /ws ra internet" autocomplete="off" />
+      </div>
 
       <h2>2. Hello message</h2>
       <div class="codebox"><button class="copybtn" data-copy>Copy</button><code>{
   "type": "hello",
   "version": 1,
   "device_id": "esp32-001",
-  "token": "test",
+  "token": "&lt;DEVICE_TOKEN_SECRET&gt;",
   "transport": "websocket",
   "audio_params": {
     "format": "opus",
@@ -646,6 +721,131 @@ WHISPER_MODEL=medium
 TTS_PROVIDER=edge
 AGENT_PROVIDER=hermes
 HERMES_URL=http://127.0.0.1:8642</code></div>
+    </div>
+  </section>
+
+  <!-- TAB: Cài đặt -->
+  <section class="panel" id="panelSettings" role="tabpanel">
+    <div class="card hidden" id="desktopSettingsCard">
+      <h2 class="card-title">Ứng dụng desktop</h2>
+      <p class="card-desc">Chạy nền sau khi đóng cửa sổ. Icon nằm ở khay hệ thống (Windows) hoặc menu bar (macOS).</p>
+      <label class="check-row full" style="margin:.5rem 0 .25rem">
+        <input type="checkbox" id="chkAutostart" />
+        <span id="autostartLabel">Khởi động cùng hệ thống</span>
+      </label>
+      <p class="reach" id="autostartHint" style="font-size:.76rem;margin-top:.35rem">
+        Tùy chọn — bật nếu muốn gateway tự chạy khi máy khởi động.
+      </p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Giao diện</h2>
+      <p class="card-desc">Chọn theme hiển thị. Mặc định: tối.</p>
+      <div class="theme-options">
+        <div class="theme-card selected" id="themeDark" data-theme="dark">
+          <div class="theme-preview dark"></div>
+          <span>🌙 Tối</span>
+        </div>
+        <div class="theme-card" id="themeLight" data-theme="light">
+          <div class="theme-preview light"></div>
+          <span>☀ Sáng</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Cổng máy chủ</h2>
+      <p class="card-desc">HTTP + WebSocket dùng chung một port. Đổi port sẽ ghi <code>.env</code> và restart gateway.</p>
+      <div class="port-settings">
+        <div class="port-field">
+          <span class="port-badge">TCP</span>
+          <div class="port-row">
+            <label for="inpPort" class="port-label">Port</label>
+            <input type="number" id="inpPort" min="1024" max="65535" step="1" inputmode="numeric" placeholder="8888" />
+          </div>
+          <span class="port-range">1024 – 65535</span>
+        </div>
+        <div class="port-actions btn-row">
+          <button type="button" class="btn-primary" id="btnRestartServer">Áp dụng &amp; restart</button>
+        </div>
+      </div>
+      <p class="reach" id="portHint"></p>
+    </div>
+    <div class="card">
+      <div class="card-title-row">
+        <h2 class="card-title">Internet (domain công khai)</h2>
+        <button type="button" class="help-btn" id="btnPublicHelp" title="Hướng dẫn Cloudflare Tunnel" aria-label="Hướng dẫn bật domain công khai">?</button>
+      </div>
+      <p class="card-desc">
+        Bật để ESP32 / trình duyệt ngoài nhà kết nối qua Cloudflare Tunnel.
+        Hostname Named Tunnel <b>không đổi</b>. Sau khi áp dụng, app có thể <b>tự cài cloudflared + tunnel</b>.
+      </p>
+      <label class="check-row full" style="margin:.5rem 0 .75rem">
+        <input type="checkbox" id="chkPublicEnabled" />
+        Mở ra internet
+      </label>
+      <div class="cfg" id="publicFields">
+        <div class="full">
+          <label for="inpPublicHostname">Hostname (vd voice.yourdomain.com)</label>
+          <input type="text" id="inpPublicHostname" placeholder="voice.yourdomain.com" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="full">
+          <label for="inpPublicToken">Device token (ESP32 hello.token)</label>
+          <input type="text" id="inpPublicToken" placeholder="Tự tạo khi bật nếu để trống" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="full">
+          <label>Trình duyệt</label>
+          <div class="urlrow" style="margin:0">
+            <input type="text" id="publicHttpPreview" readonly />
+            <button type="button" class="copybtn" id="copyPublicHttp">Copy</button>
+          </div>
+        </div>
+        <div class="full">
+          <label>ESP32 WebSocket</label>
+          <div class="urlrow" style="margin:0">
+            <input type="text" id="publicWsPreview" readonly />
+            <button type="button" class="copybtn" id="copyPublicWs">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="port-actions btn-row" style="margin-top:.85rem">
+        <button type="button" class="btn-primary" id="btnApplyPublic">Áp dụng domain &amp; restart</button>
+        <button type="button" class="btn-secondary" id="btnTestTunnelStatus">Kiểm tra trạng thái</button>
+        <button type="button" class="btn-success hidden" id="btnSetupTunnelQuick">Thiết lập tunnel tự động</button>
+      </div>
+      <p class="reach" id="publicHint" style="margin-top:.5rem;font-size:.76rem;white-space:pre-wrap">
+        Nhập hostname → bấm <b>Áp dụng</b> → app tự mở hướng dẫn và chạy tunnel (chỉ cần đăng nhập Cloudflare một lần trong trình duyệt).
+      </p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Bảo mật WSS (LAN)</h2>
+      <p class="card-desc">Bật HTTPS/WSS cho ESP32 và thiết bị trong mạng LAN. Máy local (Tauri/trình duyệt) vẫn dùng <code>ws://127.0.0.1</code>.</p>
+      <label class="check-row full" style="margin:.5rem 0 .75rem">
+        <input type="checkbox" id="chkTlsEnabled" />
+        Bật WSS cho LAN
+      </label>
+      <div class="cfg">
+        <div class="full">
+          <label>WebSocket local</label>
+          <input type="text" id="wsPreviewLocal" readonly />
+        </div>
+        <div class="full">
+          <label>WebSocket LAN (ESP32)</label>
+          <input type="text" id="wsPreviewLan" readonly />
+        </div>
+      </div>
+      <p class="reach" id="tlsHint" style="margin-top:.5rem;font-size:.76rem">
+        ESP32 có thể <b>tự nhận cert</b> qua hello WSS (lần đầu bỏ qua verify TLS, lưu <code>tls_cert</code> vào NVS).
+        Hoặc copy cert bên dưới nếu firmware hỗ trợ nhập PEM.
+        <b>Cloudflare Tunnel:</b> giữ tắt WSS này — Cloudflare cấp HTTPS/WSS; đặt <code>HOST=127.0.0.1</code> trong <code>.env</code>.
+      </p>
+      <div class="cfg" id="tlsCertBlock" style="margin-top:.5rem;display:none">
+        <div class="full">
+          <label>Fingerprint SHA-256</label>
+          <input type="text" id="tlsFingerprint" readonly />
+        </div>
+        <div class="full btn-row">
+          <button type="button" class="btn-secondary" id="btnCopyTlsCert">Copy cert PEM</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -714,84 +914,62 @@ HERMES_URL=http://127.0.0.1:8642</code></div>
     </div>
   </section>
 
-  <!-- TAB: Cài đặt -->
-  <section class="panel" id="panelSettings" role="tabpanel">
-    <div class="card hidden" id="desktopSettingsCard">
-      <h2 class="card-title">Ứng dụng desktop</h2>
-      <p class="card-desc">Chạy nền sau khi đóng cửa sổ. Icon nằm ở khay hệ thống (Windows) hoặc menu bar (macOS).</p>
-      <label class="check-row full" style="margin:.5rem 0 .25rem">
-        <input type="checkbox" id="chkAutostart" />
-        <span id="autostartLabel">Khởi động cùng hệ thống</span>
-      </label>
-      <p class="reach" id="autostartHint" style="font-size:.76rem;margin-top:.35rem">
-        Tùy chọn — bật nếu muốn gateway tự chạy khi máy khởi động.
-      </p>
-    </div>
-    <div class="card">
-      <h2 class="card-title">Giao diện</h2>
-      <p class="card-desc">Chọn theme hiển thị. Mặc định: tối.</p>
-      <div class="theme-options">
-        <div class="theme-card selected" id="themeDark" data-theme="dark">
-          <div class="theme-preview dark"></div>
-          <span>🌙 Tối</span>
-        </div>
-        <div class="theme-card" id="themeLight" data-theme="light">
-          <div class="theme-preview light"></div>
-          <span>☀ Sáng</span>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <h2 class="card-title">Cổng máy chủ</h2>
-      <p class="card-desc">HTTP + WebSocket dùng chung một port. Đổi port sẽ ghi <code>.env</code> và restart gateway.</p>
-      <div class="port-settings">
-        <div class="port-field">
-          <span class="port-badge">TCP</span>
-          <div class="port-row">
-            <label for="inpPort" class="port-label">Port</label>
-            <input type="number" id="inpPort" min="1024" max="65535" step="1" inputmode="numeric" placeholder="8888" />
-          </div>
-          <span class="port-range">1024 – 65535</span>
-        </div>
-        <div class="port-actions btn-row">
-          <button type="button" class="btn-primary" id="btnRestartServer">Áp dụng &amp; restart</button>
-        </div>
-      </div>
-      <p class="reach" id="portHint"></p>
-    </div>
-    <div class="card">
-      <h2 class="card-title">Bảo mật WSS (LAN)</h2>
-      <p class="card-desc">Bật HTTPS/WSS cho ESP32 và thiết bị trong mạng LAN. Máy local (Tauri/trình duyệt) vẫn dùng <code>ws://127.0.0.1</code>.</p>
-      <label class="check-row full" style="margin:.5rem 0 .75rem">
-        <input type="checkbox" id="chkTlsEnabled" />
-        Bật WSS cho LAN
-      </label>
-      <div class="cfg">
-        <div class="full">
-          <label>WebSocket local</label>
-          <input type="text" id="wsPreviewLocal" readonly />
-        </div>
-        <div class="full">
-          <label>WebSocket LAN (ESP32)</label>
-          <input type="text" id="wsPreviewLan" readonly />
-        </div>
-      </div>
-      <p class="reach" id="tlsHint" style="margin-top:.5rem;font-size:.76rem">
-        ESP32 có thể <b>tự nhận cert</b> qua hello WSS (lần đầu bỏ qua verify TLS, lưu <code>tls_cert</code> vào NVS).
-        Hoặc copy cert bên dưới nếu firmware hỗ trợ nhập PEM.
-      </p>
-      <div class="cfg" id="tlsCertBlock" style="margin-top:.5rem;display:none">
-        <div class="full">
-          <label>Fingerprint SHA-256</label>
-          <input type="text" id="tlsFingerprint" readonly />
-        </div>
-        <div class="full btn-row">
-          <button type="button" class="btn-secondary" id="btnCopyTlsCert">Copy cert PEM</button>
-        </div>
-      </div>
-    </div>
-  </section>
+</div>
 
+<div class="modal-overlay" id="publicHelpModal" role="dialog" aria-modal="true" aria-labelledby="publicHelpTitle" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="publicHelpTitle">Hướng dẫn bật domain công khai</h3>
+      <button type="button" class="modal-close" id="btnPublicHelpClose" aria-label="Đóng">&times;</button>
+    </div>
+    <div class="modal-body" id="publicHelpBody">
+      <p>App tự cấu hình gateway local và Cloudflare Named Tunnel — hostname cố định, không dùng <code>*.trycloudflare.com</code>.</p>
+      <div class="modal-tunnel-form cfg" style="margin:.35rem 0 .75rem">
+        <div class="full">
+          <label for="inpTunnelName">Tên tunnel</label>
+          <input type="text" id="inpTunnelName" value="loa-gateway" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="full btn-row" style="margin-top:.35rem">
+          <button type="button" class="btn-success" id="btnSetupTunnelFull">Thiết lập tự động (1 lần bấm)</button>
+          <button type="button" class="btn-secondary" id="btnTestTunnelStatusModal">Kiểm tra trạng thái</button>
+        </div>
+        <p class="reach" id="tunnelAutoHint" style="margin:.45rem 0 0;font-size:.76rem"></p>
+        <p class="reach" id="tunnelStepLog" style="margin:.25rem 0 0;font-size:.72rem;white-space:pre-wrap"></p>
+        <details style="margin-top:.65rem;font-size:.78rem">
+          <summary style="cursor:pointer;color:var(--text-muted)">Tùy chọn nâng cao (từng bước)</summary>
+          <div class="btn-row" style="margin-top:.45rem">
+            <button type="button" class="btn-secondary" id="btnSetupTunnelAuto">Bước 4→8</button>
+            <button type="button" class="btn-secondary" id="btnWriteCfConfig">Config (5)</button>
+            <button type="button" class="btn-secondary" id="btnRouteCfDns">DNS (6)</button>
+            <button type="button" class="btn-secondary" id="btnStartCfTunnel">Chạy (7)</button>
+            <button type="button" class="btn-secondary" id="btnTestPublic">Test (8)</button>
+            <button type="button" class="btn-secondary" id="btnInstallCfService">Service 24/7</button>
+          </div>
+        </details>
+      </div>
+      <div class="full" id="esp32ConfigBlock" hidden style="margin:.5rem 0">
+        <label>Cấu hình ESP32 (hello JSON)</label>
+        <div class="urlrow" style="margin:.25rem 0 0">
+          <pre id="esp32HelloJson" style="flex:1;margin:0;font-size:.7rem;max-height:8rem;overflow:auto"></pre>
+          <button type="button" class="copybtn" id="btnCopyEsp32Hello">Copy</button>
+        </div>
+      </div>
+      <pre id="modalCfConfig">tunnel: &lt;UUID&gt;
+credentials-file: C:\Users\Admin\.cloudflared\&lt;UUID&gt;.json
+ingress:
+  - hostname: hermes.example.com
+    service: http://127.0.0.1:8888
+  - service: http_status:404</pre>
+      <div class="modal-note">
+        <b>Chỉ cần làm tay một lần:</b> khi trình duyệt mở Cloudflare login — chọn zone domain (vd <code>loaai.me</code>).<br>
+        App tự cài <code>cloudflared</code> (winget), tạo tunnel, DNS, chạy tunnel và test URL.<br>
+        ESP32: copy JSON ở trên vào firmware — flash một lần.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-secondary" id="btnPublicHelpDismiss">Đóng</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -806,8 +984,8 @@ const TABS = {
   tabConfig: "panelConfig",
   tabSetup: "panelSetup",
   tabEsp: "panelEsp",
-  tabInfo: "panelInfo",
-  tabSettings: "panelSettings"
+  tabSettings: "panelSettings",
+  tabInfo: "panelInfo"
 };
 
 if (APP_MODE) {
@@ -875,7 +1053,24 @@ applyTheme(localStorage.getItem(THEME_KEY) || "dark");
 document.getElementById("themeDark").onclick = () => applyTheme("dark");
 document.getElementById("themeLight").onclick = () => applyTheme("light");
 
-let serverState = { tlsEnabled: false, lanIps: [], port: 8888, tlsCertSha256: null, tlsCertPem: null };
+let serverState = {
+  tlsEnabled: false, lanIps: [], port: 8888, tlsCertSha256: null, tlsCertPem: null,
+  publicEnabled: false, publicHostname: "", publicHttpUrl: "", publicWsUrl: "",
+  requireDeviceToken: false, deviceTokenSecret: ""
+};
+
+function normalizeHostnamePreview(raw) {
+  return String(raw || "").trim().toLowerCase()
+    .replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "");
+}
+
+function updatePublicPreview() {
+  const host = normalizeHostnamePreview(document.getElementById("inpPublicHostname")?.value);
+  const httpEl = document.getElementById("publicHttpPreview");
+  const wsEl = document.getElementById("publicWsPreview");
+  if (httpEl) httpEl.value = host ? `https://${host}/` : "https://voice.yourdomain.com/";
+  if (wsEl) wsEl.value = host ? `wss://${host}/ws` : "wss://voice.yourdomain.com/ws";
+}
 
 function updateWsPreview(port, tlsEnabled, lanIps) {
   const p = port || document.getElementById("inpPort")?.value || location.port || "8888";
@@ -927,6 +1122,16 @@ async function refreshTlsCertInfo() {
   }
 }
 
+function isPublicHost() {
+  const h = location.hostname;
+  return h && h !== "127.0.0.1" && h !== "localhost" && h !== "[::1]";
+}
+
+function pageWsUrl() {
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  return `${scheme}://${location.host}/ws`;
+}
+
 function syncEsp32WsUrl(port, tlsEnabled, lanIps) {
   const ips = lanIps ?? serverState.lanIps ?? [];
   const tls = tlsEnabled ?? serverState.tlsEnabled;
@@ -934,6 +1139,17 @@ function syncEsp32WsUrl(port, tlsEnabled, lanIps) {
   const wsUrlEl = document.getElementById("wsUrl");
   const hintEl = document.getElementById("espWsHint");
   if (!wsUrlEl) return;
+  if (isPublicHost()) {
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    wsUrlEl.value = `${scheme}://${location.host}/ws`;
+    if (hintEl) hintEl.textContent = "URL công khai (Cloudflare / reverse proxy). ESP32 dùng wss://…/ws và hello.token.";
+    return;
+  }
+  if (serverState.publicEnabled && serverState.publicHostname) {
+    wsUrlEl.value = `wss://${serverState.publicHostname}/ws`;
+    if (hintEl) hintEl.textContent = "Internet bật — ESP32 dùng URL này + hello.token. Cần cloudflared Named Tunnel.";
+    return;
+  }
   if (tls && ips.length) {
     wsUrlEl.value = `wss://${ips[0]}:${p}/ws`;
     if (hintEl) hintEl.textContent = "WSS bật — lần đầu ESP32 bỏ qua verify TLS, lưu tls_cert từ hello vào NVS.";
@@ -956,10 +1172,25 @@ async function loadServerSettings() {
       tlsEnabled: Boolean(s.tlsEnabled),
       lanIps: s.lanIps || [],
       port: s.port,
-      tlsCertSha256: s.tlsCertSha256 || null
+      tlsCertSha256: s.tlsCertSha256 || null,
+      publicEnabled: Boolean(s.publicEnabled),
+      publicHostname: s.publicHostname || "",
+      publicHttpUrl: s.publicHttpUrl || "",
+      publicWsUrl: s.publicWsUrl || "",
+      requireDeviceToken: Boolean(s.requireDeviceToken),
+      deviceTokenSecret: s.deviceTokenSecret || ""
     };
     document.getElementById("inpPort").value = s.port;
     document.getElementById("chkTlsEnabled").checked = Boolean(s.tlsEnabled);
+    const chkPub = document.getElementById("chkPublicEnabled");
+    const hostEl = document.getElementById("inpPublicHostname");
+    const tokEl = document.getElementById("inpPublicToken");
+    if (chkPub) chkPub.checked = Boolean(s.publicEnabled);
+    if (hostEl) hostEl.value = s.publicHostname || "";
+    if (tokEl && s.deviceTokenSecret) tokEl.value = s.deviceTokenSecret;
+    updatePublicPreview();
+    const quickBtn = document.getElementById("btnSetupTunnelQuick");
+    if (quickBtn) quickBtn.classList.toggle("hidden", !s.publicEnabled);
     updateWsPreview(s.port, s.tlsEnabled, s.lanIps);
     await refreshTlsCertInfo();
   } catch {
@@ -1007,6 +1238,432 @@ async function waitForServer(port, attempts = 40) {
   return false;
 }
 
+document.getElementById("inpPublicHostname")?.addEventListener("input", updatePublicPreview);
+document.getElementById("copyPublicHttp")?.addEventListener("click", (e) => {
+  copyText(document.getElementById("publicHttpPreview").value, e.target);
+});
+document.getElementById("copyPublicWs")?.addEventListener("click", (e) => {
+  copyText(document.getElementById("publicWsPreview").value, e.target);
+});
+
+function refreshPublicHelpModal() {
+  const port = document.getElementById("inpPort")?.value || serverState.port || "8888";
+  const host = normalizeHostnamePreview(document.getElementById("inpPublicHostname")?.value) || "hermes.example.com";
+  const tunnelName = document.getElementById("inpTunnelName")?.value?.trim() || "loa-gateway";
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  set("modalHealthUrl", `http://127.0.0.1:${port}/health`);
+  set("modalRouteDns", `cloudflared tunnel route dns ${tunnelName} ${host}`);
+  set("modalPublicHealth", `https://${host}/health`);
+  set("modalPublicWs", `wss://${host}/ws`);
+  const pre = document.getElementById("modalCfConfig");
+  if (pre) {
+    pre.textContent =
+`tunnel: <UUID>
+credentials-file: %USERPROFILE%/.cloudflared/<UUID>.json
+ingress:
+  - hostname: ${host}
+    service: http://127.0.0.1:${port}
+  - service: http_status:404`;
+  }
+}
+
+async function refreshTunnelAutoStatus() {
+  await testTunnelStatusUi({ quiet: true });
+}
+
+function tunnelConnectionCount(s) {
+  if (!s?.tunnels?.length) return 0;
+  return s.tunnels.reduce((n, t) => n + (t.connections?.length || 0), 0);
+}
+
+function formatTunnelStatusLines(s, { publicTest, hostname } = {}) {
+  const lines = [];
+  lines.push(s.cloudflaredInstalled
+    ? `✓ cloudflared${s.cloudflaredPath ? ` (${s.cloudflaredPath})` : ""}`
+    : "✗ cloudflared — chưa cài hoặc thiếu CLOUDFLARED_PATH");
+  lines.push(s.cloudflaredLoggedIn ? "✓ Đăng nhập Cloudflare" : "✗ Chưa đăng nhập Cloudflare");
+  lines.push(s.configExists ? "✓ config.yml" : "✗ Thiếu config.yml");
+  if (s.tunnelRunning) {
+    lines.push(`✓ Tunnel chạy trên máy (pid ${s.tunnelPid})`);
+  } else {
+    const conn = tunnelConnectionCount(s);
+    if (conn > 0) lines.push(`✓ Tunnel online qua Cloudflare (${conn} kết nối)`);
+    else lines.push("○ Tunnel chưa chạy trên máy — bấm Thiết lập hoặc Chạy (7)");
+  }
+  if (s.tunnelsError) lines.push(`⚠ ${s.tunnelsError}`);
+  if (s.tunnels?.length) {
+    const names = s.tunnels.map((t) => t.name || t.id?.slice(0, 8)).join(", ");
+    lines.push(`  Tunnel: ${names}`);
+  }
+  if (hostname) {
+    if (publicTest?.ok) lines.push(`✓ URL công khai: https://${hostname}/health`);
+    else if (publicTest) lines.push(`✗ URL công khai: ${publicTest.error || "chưa phản hồi"}`);
+    else lines.push(`… Chưa test https://${hostname}/health`);
+  }
+  return lines;
+}
+
+function tunnelStatusClass(s, publicTest) {
+  const conn = tunnelConnectionCount(s);
+  const tunnelUp = s.tunnelRunning || conn > 0;
+  const ok = s.cloudflaredInstalled && s.cloudflaredLoggedIn && s.configExists && tunnelUp;
+  if (ok && publicTest?.ok) return "reach ok";
+  if (!s.cloudflaredInstalled || !s.cloudflaredLoggedIn) return "reach bad";
+  return "reach";
+}
+
+async function testTunnelStatusUi({ quiet = false } = {}) {
+  const hint = document.getElementById("publicHint");
+  const modalHint = document.getElementById("tunnelAutoHint");
+  const logEl = document.getElementById("tunnelStepLog");
+  const btns = [
+    document.getElementById("btnTestTunnelStatus"),
+    document.getElementById("btnTestTunnelStatusModal")
+  ].filter(Boolean);
+  const hostname = normalizeHostnamePreview(document.getElementById("inpPublicHostname")?.value);
+
+  btns.forEach((b) => { b.disabled = true; });
+  if (!quiet) {
+    if (hint) { hint.className = "reach"; hint.textContent = "Đang kiểm tra trạng thái…"; }
+    if (modalHint) { modalHint.className = "reach"; modalHint.textContent = "Đang kiểm tra trạng thái…"; }
+    if (logEl) logEl.textContent = "";
+  }
+
+  try {
+    const s = await fetchJson("/api/tunnel/status");
+    let publicTest = null;
+    if (hostname) {
+      try {
+        publicTest = await fetchJson(`/api/tunnel/test-public?hostname=${encodeURIComponent(hostname)}`);
+      } catch (e) {
+        publicTest = { ok: false, error: e.message };
+      }
+    }
+    const lines = formatTunnelStatusLines(s, { publicTest, hostname });
+    const summary = lines.join("\n");
+    const oneLine = lines.filter((l) => !l.startsWith("  ")).map((l) => l.replace(/^✓ |^✗ |^○ |^⚠ |^… /, "")).join(" · ");
+    const cls = tunnelStatusClass(s, publicTest);
+
+    if (hint) { hint.className = cls; hint.textContent = quiet ? oneLine : summary; }
+    if (modalHint) { modalHint.className = cls; modalHint.textContent = oneLine; }
+    if (logEl && !quiet) logEl.textContent = summary;
+    if (s.configYaml) {
+      const pre = document.getElementById("modalCfConfig");
+      if (pre) pre.textContent = s.configYaml.trim();
+    }
+    return { s, publicTest, lines };
+  } catch (e) {
+    const msg = String(e.message || e);
+    const text = msg.includes("Gateway cũ") || msg.includes("HTML")
+      ? "Gateway cũ — thoát app (tray → Thoát) rồi mở lại."
+      : ("Không kiểm tra được: " + msg);
+    if (hint) { hint.className = "reach bad"; hint.textContent = text; }
+    if (modalHint) { modalHint.className = "reach bad"; modalHint.textContent = text; }
+    if (logEl && !quiet) logEl.textContent = text;
+    return null;
+  } finally {
+    btns.forEach((b) => { b.disabled = false; });
+  }
+}
+
+function tunnelFormPayload() {
+  const port = Number(document.getElementById("inpPort")?.value) || serverState.port || 8888;
+  const hostname = document.getElementById("inpPublicHostname")?.value?.trim();
+  const tunnelName = document.getElementById("inpTunnelName")?.value?.trim() || "loa-gateway";
+  return { port, hostname, tunnelName };
+}
+
+function formatTunnelSteps(steps) {
+  if (!steps?.length) return "";
+  const labels = {
+    install: "Cài cloudflared",
+    login_launch: "Mở đăng nhập CF",
+    login_wait: "Chờ đăng nhập CF",
+    login: "Đăng nhập CF",
+    cloudflared: "Kiểm tra cloudflared",
+    create: "Tạo tunnel",
+    config: "Ghi config.yml",
+    dns: "Trỏ DNS",
+    start: "Chạy tunnel",
+    test: "Test URL công khai",
+    service: "Cài Windows service",
+    service_start: "Khởi động service"
+  };
+  return steps.map((s) => {
+    const mark = s.ok ? "✓" : (s.skipped ? "○" : "✗");
+    const extra = s.alreadyExists ? " (đã có)" : s.alreadyRunning ? " (đang chạy)" : s.alreadyLoggedIn ? " (đã login)" : s.installed ? " (vừa cài)" : "";
+    const err = s.ok ? (s.hint ? ` — ${s.hint}` : "") : (s.error ? ` — ${s.error}` : "");
+    return `${mark} ${labels[s.step] || s.step}${extra}${err}`;
+  }).join("\n");
+}
+
+function showEsp32Config(esp32) {
+  const block = document.getElementById("esp32ConfigBlock");
+  const pre = document.getElementById("esp32HelloJson");
+  if (!block || !pre || !esp32?.hello) return;
+  pre.textContent = JSON.stringify(esp32.hello, null, 2);
+  block.hidden = false;
+}
+
+async function loadEsp32ConfigUi() {
+  try {
+    const hostname = normalizeHostnamePreview(document.getElementById("inpPublicHostname")?.value);
+    if (!hostname) return;
+    const r = await fetchJson(`/api/tunnel/esp32-config?hostname=${encodeURIComponent(hostname)}`);
+    showEsp32Config(r);
+  } catch { /* ignore */ }
+}
+
+async function runTunnelAction(label, fn, { long = false } = {}) {
+  const hint = document.getElementById("tunnelAutoHint");
+  const logEl = document.getElementById("tunnelStepLog");
+  const { hostname, tunnelName, port } = tunnelFormPayload();
+  if (!normalizeHostnamePreview(hostname)) {
+    hint.className = "reach bad";
+    hint.textContent = "Nhập hostname ở tab Cài đặt trước.";
+    return null;
+  }
+  if (logEl) { logEl.dataset.busy = "1"; logEl.textContent = `${label}… (có thể mất vài phút)`; }
+  hint.className = "reach";
+  hint.textContent = `${label}…`;
+  try {
+    const fetchFn = long ? fetchJsonLong : fetchJson;
+    const r = await fn({ tunnelName, hostname, port }, fetchFn);
+    if (r.steps) {
+      if (logEl) logEl.textContent = formatTunnelSteps(r.steps);
+      if (r.needsLogin) {
+        hint.className = "reach bad";
+        hint.textContent = r.userAction || "Hoàn tất đăng nhập Cloudflare trong trình duyệt rồi bấm Thiết lập lại";
+        return r;
+      }
+      if (r.needsInstall) {
+        hint.className = "reach bad";
+        hint.textContent = "Không cài được cloudflared — thử mở lại app hoặc cài thủ công";
+        return r;
+      }
+      hint.className = r.ok ? "reach ok" : "reach bad";
+      hint.textContent = r.ok
+        ? `Xong · ${r.publicHttpUrl || ""} · ${r.publicWsUrl || ""}`
+        : (r.error || "Một bước thất bại — xem log bên dưới");
+    } else {
+      hint.className = r.ok === false ? "reach bad" : "reach ok";
+      hint.textContent = r.output || r.url || label + " xong";
+      if (logEl) logEl.textContent = r.output || r.url || "";
+    }
+    if (r.yaml) {
+      const pre = document.getElementById("modalCfConfig");
+      if (pre) pre.textContent = r.yaml.trim();
+    }
+    if (r.esp32) showEsp32Config(r.esp32);
+    await refreshTunnelAutoStatus();
+    return r;
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = e.message;
+    if (logEl) logEl.textContent = e.message;
+    return null;
+  } finally {
+    if (logEl) delete logEl.dataset.busy;
+  }
+}
+
+async function writeCfConfigAuto() {
+  await runTunnelAction("Tạo config.yml", ({ tunnelName, hostname, port }, fetchFn) =>
+    fetchFn("/api/tunnel/write-config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tunnelName, hostname, port })
+    })
+  );
+}
+
+async function routeCfDnsAuto() {
+  await runTunnelAction("Trỏ DNS", ({ tunnelName, hostname }, fetchFn) =>
+    fetchFn("/api/tunnel/route-dns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tunnelName, hostname })
+    })
+  );
+}
+
+async function setupTunnelAutoUi() {
+  const btn = document.getElementById("btnSetupTunnelAuto");
+  if (btn) btn.disabled = true;
+  try {
+    await runTunnelAction("Tự động bước 4→8", ({ tunnelName, hostname, port }, fetchFn) =>
+      fetchFn("/api/tunnel/setup-auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tunnelName, hostname, port })
+      })
+    );
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function setupTunnelFullUi({ auto = false } = {}) {
+  const btn = document.getElementById("btnSetupTunnelFull");
+  const quick = document.getElementById("btnSetupTunnelQuick");
+  if (btn) btn.disabled = true;
+  if (quick) quick.disabled = true;
+  const deviceToken = document.getElementById("inpPublicToken")?.value?.trim() || "";
+  try {
+    const r = await runTunnelAction("Thiết lập tự động", ({ tunnelName, hostname, port }, fetchFn) =>
+      fetchFn("/api/tunnel/setup-full", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tunnelName, hostname, port, installService: true, deviceToken })
+      }), { long: true }
+    );
+    if (auto && r?.needsLogin) {
+      const hint = document.getElementById("tunnelAutoHint");
+      if (hint) hint.textContent = "Đang chờ bạn đăng nhập Cloudflare trong trình duyệt…";
+    }
+    return r;
+  } finally {
+    if (btn) btn.disabled = false;
+    if (quick) quick.disabled = false;
+  }
+}
+
+async function startCfTunnelUi() {
+  await runTunnelAction("Chạy tunnel", ({ tunnelName }, fetchFn) =>
+    fetchFn("/api/tunnel/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tunnelName })
+    })
+  );
+}
+
+async function testPublicUi() {
+  await runTunnelAction("Test URL công khai", ({ hostname }, fetchFn) =>
+    fetchFn(`/api/tunnel/test-public?hostname=${encodeURIComponent(normalizeHostnamePreview(hostname))}`)
+  );
+}
+
+async function installCfServiceUi() {
+  await runTunnelAction("Cài Windows service", (_p, fetchFn) =>
+    fetchFn("/api/tunnel/install-service", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+  );
+}
+
+function openPublicHelpModal({ autoSetup = false } = {}) {
+  refreshPublicHelpModal();
+  refreshTunnelAutoStatus();
+  loadEsp32ConfigUi();
+  const modal = document.getElementById("publicHelpModal");
+  if (!modal) return;
+  modal.hidden = false;
+  modal.classList.add("open");
+  document.body.style.overflow = "hidden";
+  document.getElementById("btnPublicHelpClose")?.focus();
+  if (autoSetup) {
+    setTimeout(() => setupTunnelFullUi({ auto: true }), 400);
+  }
+}
+
+function closePublicHelpModal() {
+  const modal = document.getElementById("publicHelpModal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.hidden = true;
+  document.body.style.overflow = "";
+}
+
+document.getElementById("btnPublicHelp")?.addEventListener("click", () => openPublicHelpModal());
+document.getElementById("btnSetupTunnelQuick")?.addEventListener("click", () => openPublicHelpModal({ autoSetup: true }));
+document.getElementById("btnTestTunnelStatus")?.addEventListener("click", () => testTunnelStatusUi());
+document.getElementById("btnTestTunnelStatusModal")?.addEventListener("click", () => testTunnelStatusUi());
+document.getElementById("inpTunnelName")?.addEventListener("input", refreshPublicHelpModal);
+document.getElementById("btnSetupTunnelFull")?.addEventListener("click", () => setupTunnelFullUi());
+document.getElementById("btnSetupTunnelAuto")?.addEventListener("click", setupTunnelAutoUi);
+document.getElementById("btnWriteCfConfig")?.addEventListener("click", writeCfConfigAuto);
+document.getElementById("btnRouteCfDns")?.addEventListener("click", routeCfDnsAuto);
+document.getElementById("btnStartCfTunnel")?.addEventListener("click", startCfTunnelUi);
+document.getElementById("btnTestPublic")?.addEventListener("click", testPublicUi);
+document.getElementById("btnInstallCfService")?.addEventListener("click", installCfServiceUi);
+document.getElementById("btnCopyEsp32Hello")?.addEventListener("click", (e) => {
+  copyText(document.getElementById("esp32HelloJson")?.textContent || "", e.target);
+});
+document.getElementById("btnPublicHelpClose")?.addEventListener("click", closePublicHelpModal);
+document.getElementById("btnPublicHelpDismiss")?.addEventListener("click", closePublicHelpModal);
+document.getElementById("publicHelpModal")?.addEventListener("click", (e) => {
+  if (e.target.id === "publicHelpModal") closePublicHelpModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("publicHelpModal")?.classList.contains("open")) {
+    closePublicHelpModal();
+  }
+});
+
+document.getElementById("btnApplyPublic").onclick = async () => {
+  const btn = document.getElementById("btnApplyPublic");
+  const hint = document.getElementById("publicHint");
+  const port = Number(document.getElementById("inpPort").value) || serverState.port || 8888;
+  const publicEnabled = document.getElementById("chkPublicEnabled").checked;
+  const publicHostname = document.getElementById("inpPublicHostname").value.trim();
+  const deviceTokenSecret = document.getElementById("inpPublicToken").value.trim();
+  if (publicEnabled && !normalizeHostnamePreview(publicHostname)) {
+    hint.className = "reach bad";
+    hint.textContent = "Nhập hostname (vd voice.yourdomain.com) — domain đã add vào Cloudflare.";
+    return;
+  }
+  if (publicHostname.toLowerCase().includes("trycloudflare.com")) {
+    hint.className = "reach bad";
+    hint.textContent = "Không dùng *.trycloudflare.com — link đó đổi mỗi lần chạy. Dùng Named Tunnel + domain cố định.";
+    return;
+  }
+  btn.disabled = true;
+  hint.className = "reach";
+  hint.textContent = publicEnabled
+    ? `Đang bật internet (${normalizeHostnamePreview(publicHostname)}) và restart…`
+    : "Đang tắt internet (về LAN) và restart…";
+  try {
+    const result = await fetchJson("/api/server/restart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        port,
+        publicEnabled,
+        publicHostname,
+        deviceTokenSecret: deviceTokenSecret || undefined,
+        tlsEnabled: publicEnabled ? false : document.getElementById("chkTlsEnabled").checked
+      })
+    });
+    if (result.deviceTokenSecret) {
+      const tokEl = document.getElementById("inpPublicToken");
+      if (tokEl) tokEl.value = result.deviceTokenSecret;
+      try { localStorage.setItem("vg_device_token", result.deviceTokenSecret); } catch { /* ignore */ }
+    }
+    hint.textContent = "Đang chờ server mới…";
+    const ok = await waitForServer(port);
+    btn.disabled = false;
+    if (!ok) {
+      hint.className = "reach bad";
+      hint.textContent = `Không kết nối được port ${port}. Kiểm tra terminal / chạy lại app.`;
+      return;
+    }
+    hint.className = "reach ok";
+    hint.textContent = publicEnabled
+      ? `Gateway sẵn sàng · https://${normalizeHostnamePreview(publicHostname)}/`
+      : "Đã tắt internet — chỉ LAN.";
+    const quickBtn = document.getElementById("btnSetupTunnelQuick");
+    if (quickBtn) {
+      quickBtn.classList.toggle("hidden", !publicEnabled);
+    }
+    if (publicEnabled) {
+      openPublicHelpModal({ autoSetup: true });
+    }
+  } catch (e) {
+    hint.className = "reach bad";
+    hint.textContent = "Lỗi: " + e.message;
+    btn.disabled = false;
+  }
+};
+
 document.getElementById("btnRestartServer").onclick = async () => {
   const btn = document.getElementById("btnRestartServer");
   const hint = document.getElementById("portHint");
@@ -1045,7 +1702,7 @@ async function loadAppVersion() {
     const r = await fetch("/health");
     const j = await r.json();
     if (!j.version) return;
-    const versionLine = `Phiên bản ${j.version} · WebSocket <code style="font-size:.78rem">${j.wsUrlLocal || `ws://${location.host}/ws`}</code>${j.tlsEnabled ? " · WSS LAN" : ""}`;
+    const versionLine = `Phiên bản ${j.version} · WebSocket <code style="font-size:.78rem">${isPublicHost() ? pageWsUrl() : (j.wsUrlLocal || pageWsUrl())}</code>${j.tlsEnabled ? " · WSS LAN" : ""}`;
     const infoTab = document.getElementById("appVersionInfoTab");
     if (infoTab) infoTab.innerHTML = versionLine;
   } catch {}
@@ -1096,6 +1753,15 @@ async function loadConvHistory() {
   if (!listEl) return;
   try {
     const r = await fetch("/api/conversations");
+    if (!r.ok) {
+      if (emptyEl) {
+        emptyEl.textContent = r.status === 403
+          ? "Lịch sử hội thoại chỉ xem được trên máy chạy gateway (127.0.0.1)."
+          : "Không tải được lịch sử.";
+        emptyEl.classList.remove("hidden");
+      }
+      return;
+    }
     const j = await r.json();
     const items = j.items || [];
     listEl.innerHTML = "";
@@ -1260,11 +1926,19 @@ function refreshSttUi() {
   if (el) el.textContent = hint;
 }
 
+function deviceToken() {
+  const el = document.getElementById("inpDeviceToken");
+  if (el && el.value) return el.value;
+  try { return localStorage.getItem("vg_device_token") || ""; } catch { return ""; }
+}
+
 function helloPayload() {
   const p = currentPrefs();
+  const token = deviceToken();
   return {
     type: "hello", version: 1, features: { mcp: true }, transport: "websocket",
     device_id: DEVICE_ID, agent: p.agent, tts: p.tts, voice: p.voice,
+    ...(token ? { token } : {}),
     audio_params: { format: "pcm", sample_rate: 16000, channels: 1, frame_duration: 60 }
   };
 }
@@ -1361,9 +2035,38 @@ async function fetchJson(url, init) {
   const raw = await res.text();
   let data;
   try { data = JSON.parse(raw); }
-  catch { throw new Error("Server trả HTML — restart gateway rồi F5."); }
-  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  catch {
+    if (/Cannot (GET|POST) \/api\//.test(raw) || raw.includes("<!DOCTYPE")) {
+      throw new Error("Gateway cũ thiếu API mới — thoát app (tray → Thoát) rồi mở lại, hoặc tắt Node trên port 8888.");
+    }
+    throw new Error("Server trả HTML — restart gateway rồi F5.");
+  }
+  if (!res.ok) throw new Error(data.error || data.userAction || ("HTTP " + res.status));
   return data;
+}
+
+async function fetchJsonLong(url, init, timeoutMs = 360000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch {
+      if (/Cannot (GET|POST) \/api\//.test(raw) || raw.includes("<!DOCTYPE")) {
+        throw new Error("Gateway cũ thiếu API mới — thoát app (tray → Thoát) rồi mở lại.");
+      }
+      throw new Error("Server trả HTML — restart gateway rồi F5.");
+    }
+    if (!res.ok) throw new Error(data.error || data.userAction || ("HTTP " + res.status));
+    return data;
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Hết thời gian chờ — thử lại (cài/login có thể mất vài phút)");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function loadOptions() {
@@ -1529,7 +2232,7 @@ let audioCtx, stream, processor;
 
 document.getElementById("start").onclick = async () => {
   try {
-    wsA = new WebSocket(`ws://${location.host}/ws`);
+    wsA = new WebSocket(pageWsUrl());
     wsA.binaryType = "arraybuffer";
     wsA.onopen = () => wsA.send(JSON.stringify(helloPayload()));
     wsA.onmessage = (ev) => onMessage(ev, logA);
@@ -1568,7 +2271,7 @@ document.getElementById("stop").onclick = () => {
 document.getElementById("shotBtn").onclick = () => {
   const ws = wsA?.readyState === WebSocket.OPEN ? wsA : wsT?.readyState === WebSocket.OPEN ? wsT : null;
   if (ws) { ws.send(JSON.stringify({ type: "screenshot" })); return; }
-  wsT = new WebSocket(`ws://${location.host}/ws`);
+  wsT = new WebSocket(pageWsUrl());
   wsT.binaryType = "arraybuffer";
   wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload())); wsT.send(JSON.stringify({ type: "screenshot" })); logT.log("sys", "🖼 chụp màn hình…"); };
   wsT.onmessage = (ev) => onMessage(ev, logT);
@@ -1580,7 +2283,7 @@ document.getElementById("send").onclick = () => {
   if (!text) return;
   input.value = ""; input.focus();
   if (!wsT || wsT.readyState !== WebSocket.OPEN) {
-    wsT = new WebSocket(`ws://${location.host}/ws`);
+    wsT = new WebSocket(pageWsUrl());
     wsT.binaryType = "arraybuffer";
     wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload())); wsT.send(JSON.stringify({ type: "text", text })); logT.log("you", "💬 " + text); };
     wsT.onmessage = (ev) => onMessage(ev, logT);
@@ -1594,12 +2297,26 @@ document.getElementById("textInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); document.getElementById("send").click(); }
 });
 
+const tokenEl = document.getElementById("inpDeviceToken");
+if (tokenEl) {
+  try { tokenEl.value = localStorage.getItem("vg_device_token") || ""; } catch { /* ignore */ }
+  tokenEl.addEventListener("change", () => {
+    try { localStorage.setItem("vg_device_token", tokenEl.value); } catch { /* ignore */ }
+  });
+}
+
 if (APP_MODE) showTab("tabSetup");
 else {
   loadConvHistory();
   startConvPoll();
 }
-loadOptions().catch((e) => { document.getElementById("reachHint").textContent = "Lỗi tải options: " + e.message; });
+loadOptions().catch((e) => {
+  const el = document.getElementById("reachHint");
+  if (!el) return;
+  el.textContent = isPublicHost()
+    ? "Cấu hình Agent/TTS chỉ đổi được trên máy chạy gateway (127.0.0.1)."
+    : "Lỗi tải options: " + e.message;
+});
 loadServerSettings();
 </script>
 </body>

@@ -13,11 +13,37 @@ import { getStt, initSttFromEnv } from "./runtime/sttRuntime.js";
 import { runDevSetup } from "./runtime/devSetup.js";
 import { runDiagnostics } from "./runtime/diagnostics.js";
 import { getServerInfo, restartGateway } from "./runtime/serverControl.js";
+import {
+    getTunnelStatus,
+    writeTunnelConfig,
+    routeTunnelDns,
+    createTunnel,
+    startTunnelRun,
+    stopTunnelRun,
+    installTunnelService,
+    startTunnelService,
+    testPublicHealth,
+    setupTunnelAuto,
+    setupTunnelFull,
+    buildEsp32HelloConfig
+} from "./runtime/cloudflareTunnel.js";
 import { getLanAddresses, loadTlsOptions, readPublicCertInfo, isTlsEnabled } from "./runtime/tlsSetup.js";
 import { listConversations, getConversationAudioPath } from "./runtime/conversationHistory.js";
+import { VG_ROOT } from "./runtime/envFile.js";
+
+/** Bump when adding loopback API routes — desktop app uses /health features.apiVersion to detect stale processes. */
+const GATEWAY_API_VERSION = 2;
 
 const app = express();
 app.use(express.json());
+
+function requireLoopback(req, res) {
+    if (!isLoopback(req)) {
+        res.status(403).json({ error: "Chỉ gọi API này từ máy local (127.0.0.1)" });
+        return false;
+    }
+    return true;
+}
 
 app.get("/health", async (req, res) => {
     try {
@@ -27,6 +53,7 @@ app.get("/health", async (req, res) => {
             ok: true,
             service: "loa-ai-agent-bridge",
             version: pkg.version,
+            gatewayRoot: VG_ROOT,
             port: server.port,
             host: config.host,
             tlsEnabled: server.tlsEnabled,
@@ -39,7 +66,8 @@ app.get("/health", async (req, res) => {
             tts: opts.current.tts,
             stt: opts.current.stt,
             whisperModel: opts.current.whisperModel,
-            agents: opts.agents.map((a) => ({ id: a.id, reachable: a.reachable }))
+            agents: opts.agents.map((a) => ({ id: a.id, reachable: a.reachable })),
+            features: { tunnelApi: true, apiVersion: GATEWAY_API_VERSION }
         });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
@@ -47,6 +75,7 @@ app.get("/health", async (req, res) => {
 });
 
 app.get("/api/options", async (req, res) => {
+    if (!requireLoopback(req, res)) return;
     try {
         res.json(await publicOptions());
     } catch (e) {
@@ -55,6 +84,7 @@ app.get("/api/options", async (req, res) => {
 });
 
 app.post("/api/options", async (req, res) => {
+    if (!requireLoopback(req, res)) return;
     try {
         applyGlobalOptions(req.body || {});
         res.json(await publicOptions());
@@ -106,9 +136,168 @@ app.get("/api/diagnostics", async (req, res) => {
 
 app.get("/api/server", (req, res) => {
     try {
-        res.json({ ok: true, ...getServerInfo() });
+        res.json({ ok: true, ...getServerInfo({ includeSecrets: isLoopback(req) }) });
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+app.get("/api/tunnel/status", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        res.json({ ok: true, ...getTunnelStatus() });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/write-config", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const { tunnelName, hostname, port, uuid } = req.body || {};
+        const server = getServerInfo();
+        const result = writeTunnelConfig({
+            tunnelName,
+            hostname: hostname || server.publicHostname,
+            port: port ?? server.port,
+            uuid
+        });
+        if (!result.ok) return res.status(400).json(result);
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/route-dns", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const { tunnelName, hostname } = req.body || {};
+        const server = getServerInfo();
+        const result = routeTunnelDns({
+            tunnelName,
+            hostname: hostname || server.publicHostname
+        });
+        if (!result.ok) return res.status(400).json(result);
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/create", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const { tunnelName } = req.body || {};
+        const result = createTunnel(tunnelName);
+        if (!result.ok) return res.status(400).json(result);
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/start", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const { tunnelName } = req.body || {};
+        const result = startTunnelRun({ tunnelName });
+        if (!result.ok) return res.status(400).json(result);
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/stop", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        res.json(stopTunnelRun());
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/install-service", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const install = installTunnelService();
+        if (!install.ok) return res.status(400).json(install);
+        const start = startTunnelService();
+        res.json({ ok: start.ok, install, start, error: start.ok ? null : start.error });
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.get("/api/tunnel/test-public", async (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const server = getServerInfo();
+        const hostname = req.query.hostname || server.publicHostname;
+        const result = await testPublicHealth(hostname);
+        if (!result.ok) return res.status(502).json(result);
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/setup-auto", async (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const { tunnelName, hostname, port } = req.body || {};
+        const server = getServerInfo();
+        const result = await setupTunnelAuto({
+            tunnelName,
+            hostname: hostname || server.publicHostname,
+            port: port ?? server.port
+        });
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.post("/api/tunnel/setup-full", async (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    req.setTimeout(360000);
+    res.setTimeout(360000);
+    try {
+        const { tunnelName, hostname, port, installService, deviceToken } = req.body || {};
+        const server = getServerInfo({ includeSecrets: true });
+        const result = await setupTunnelFull({
+            tunnelName,
+            hostname: hostname || server.publicHostname,
+            port: port ?? server.port,
+            installService: Boolean(installService),
+            deviceToken: deviceToken || server.deviceTokenSecret || ""
+        });
+        res.json(result);
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.get("/api/tunnel/esp32-config", (req, res) => {
+    if (!requireLoopback(req, res)) return;
+    try {
+        const server = getServerInfo({ includeSecrets: true });
+        const hostname = req.query.hostname || server.publicHostname;
+        const deviceId = req.query.deviceId || "esp32-001";
+        if (!hostname) {
+            return res.status(400).json({ ok: false, error: "Chưa có PUBLIC_HOSTNAME" });
+        }
+        res.json({
+            ok: true,
+            ...buildEsp32HelloConfig({
+                hostname,
+                token: server.deviceTokenSecret || "",
+                deviceId
+            })
+        });
+    } catch (e) {
+        res.status(400).json({ ok: false, error: e.message });
     }
 });
 
@@ -150,15 +339,23 @@ app.post("/api/server/restart", (req, res) => {
         return res.status(403).json({ error: "Chỉ restart từ máy local (127.0.0.1)" });
     }
     try {
-        const { port, tlsEnabled } = req.body || {};
-        const result = restartGateway({ port, tlsEnabled });
-        res.json({ ok: true, ...result, ...getServerInfo() });
+        const { port, tlsEnabled, publicEnabled, publicHostname, requireDeviceToken, deviceTokenSecret } = req.body || {};
+        const result = restartGateway({
+            port,
+            tlsEnabled,
+            publicEnabled,
+            publicHostname,
+            requireDeviceToken,
+            deviceTokenSecret
+        });
+        res.json({ ok: true, ...result, ...getServerInfo({ includeSecrets: true }) });
     } catch (e) {
         res.status(400).json({ ok: false, error: e.message });
     }
 });
 
 app.get("/api/conversations", (req, res) => {
+    if (!requireLoopback(req, res)) return;
     try {
         res.json({ ok: true, items: listConversations() });
     } catch (e) {
@@ -167,6 +364,7 @@ app.get("/api/conversations", (req, res) => {
 });
 
 app.get("/api/conversations/:id/audio", (req, res) => {
+    if (!requireLoopback(req, res)) return;
     try {
         const file = getConversationAudioPath(req.params.id);
         if (!file) return res.status(404).json({ ok: false, error: "Không tìm thấy audio" });

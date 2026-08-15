@@ -120,10 +120,42 @@ impl GatewayProcess {
     }
 
     pub fn ensure_running(&self) -> Result<(), String> {
+        let owns_child = self
+            .child
+            .lock()
+            .map(|g| g.is_some())
+            .unwrap_or(false);
+
         if self.wait_healthy(2) {
-            eprintln!("[gateway] da chay san tren port {}", self.port);
-            return Ok(());
+            if owns_child {
+                if !self.has_current_gateway() {
+                    eprintln!(
+                        "[gateway] gateway con (pid Tauri) thiếu API mới — restart"
+                    );
+                    self.stop();
+                    thread::sleep(Duration::from_millis(900));
+                } else {
+                    return Ok(());
+                }
+            } else if !self.has_current_gateway() {
+                eprintln!(
+                    "[gateway] phát hiện gateway cũ trên port {} (apiVersion < 2) — tắt và chạy lại bản mới",
+                    self.port
+                );
+                kill_processes_on_port(self.port)?;
+                thread::sleep(Duration::from_millis(900));
+            } else if !self.has_tunnel_api() {
+                eprintln!(
+                    "[gateway] đã có gateway trên port {} (thiếu API tunnel) — tắt Node trên port này rồi mở lại app",
+                    self.port
+                );
+                return Ok(());
+            } else {
+                eprintln!("[gateway] gateway đã chạy trên port {}", self.port);
+                return Ok(());
+            }
         }
+
         self.start()?;
         if !self.wait_healthy(30) {
             let hint = fs::read_to_string(gateway_log_path()).unwrap_or_default();
@@ -170,6 +202,45 @@ impl GatewayProcess {
             thread::sleep(Duration::from_millis(500));
         }
         false
+    }
+
+    fn gateway_api_version(&self) -> u64 {
+        let url = format!("http://127.0.0.1:{}/health", self.port);
+        let Ok(resp) = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .and_then(|c| c.get(&url).send())
+        else {
+            return 0;
+        };
+        if !resp.status().is_success() {
+            return 0;
+        }
+        let Ok(body) = resp.text() else {
+            return 0;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) else {
+            return 0;
+        };
+        json.get("features")
+            .and_then(|f| f.get("apiVersion"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1)
+    }
+
+    fn has_current_gateway(&self) -> bool {
+        const EXPECTED: u64 = 2;
+        self.gateway_api_version() >= EXPECTED
+    }
+
+    fn has_tunnel_api(&self) -> bool {
+        let url = format!("http://127.0.0.1:{}/api/tunnel/status", self.port);
+        reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .and_then(|c| c.get(&url).send())
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
     }
 
     pub fn app_url(&self) -> String {
@@ -226,6 +297,15 @@ pub fn project_root() -> PathBuf {
 }
 
 pub fn bundled_root(resource_dir: Option<PathBuf>) -> PathBuf {
+    // Dev (tauri dev): luôn dùng repo gốc — tránh snapshot cũ trong target/debug/gateway-bundle.
+    if cfg!(debug_assertions) {
+        let root = project_root();
+        if let Some(found) = resolve_gateway_dir(&root) {
+            eprintln!("[gateway] dev mode — dùng repo: {}", found.display());
+            return found;
+        }
+    }
+
     let mut candidates = Vec::new();
     if let Some(res) = &resource_dir {
         candidates.push(res.join("gateway-bundle"));
@@ -304,4 +384,35 @@ fn hide_console(cmd: &mut Command) {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
     let _ = cmd;
+}
+
+fn kill_processes_on_port(port: u16) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let script = format!(
+            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {{ Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }}"
+        );
+        let status = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                &script,
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map_err(|e| format!("Khong tat process tren port {port}: {e}"))?;
+        if !status.success() {
+            return Err(format!("Khong tat duoc process tren port {port}"));
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = port;
+        Ok(())
+    }
 }

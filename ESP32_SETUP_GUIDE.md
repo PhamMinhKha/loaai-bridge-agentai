@@ -27,6 +27,7 @@ nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge x�
 | Protocol | WebSocket | |
 | URL (mặc định) | `ws://<PC_IP>:8888/ws` | Port lấy từ `PORT` trong `.env` |
 | URL (WSS bật) | `wss://<PC_IP>:8888/ws` | Bật trong tab **Cài đặt** → **WSS cho LAN** |
+| URL (Cloudflare Tunnel) | `wss://voice.yourdomain.com/ws` | Named Tunnel; hostname cố định. Tắt WSS tự ký của gateway. Xem [SETUP.md](./SETUP.md) mục 4b |
 | Audio format | **Opus** | Gateway decode Opus → PCM16 rồi chạy Whisper |
 | Sample rate | `16000` Hz | |
 | Channels | `1` (mono) | |
@@ -50,6 +51,14 @@ nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge x�
 5. Cert file trên PC: `data/tls/gateway.crt`.
 
 Nếu đổi IP LAN, xóa `data/tls/` và restart để tạo lại cert SAN.
+
+### 2.2 Internet qua Cloudflare Tunnel
+
+Không dùng IP LAN. ESP32 kết nối `wss://voice.yourdomain.com/ws` (cert Cloudflare, verify bình thường — không insecure, không lưu `tls_cert` tự ký).
+
+Trong `.env` gateway: `HOST=127.0.0.1`, `TLS_ENABLED=false`, `REQUIRE_DEVICE_TOKEN=true`, `DEVICE_TOKEN_SECRET=...`. Field `token` trong hello **phải** trùng secret. Chi tiết tạo tunnel: [SETUP.md](./SETUP.md) mục 4b.
+
+`*.trycloudflare.com` đổi mỗi lần chạy — đừng flash vào firmware.
 
 **Ví dụ xử lý hello trên ESP32 (pseudo):**
 
@@ -105,7 +114,7 @@ ESP32 gửi JSON chào server (trước khi stream audio):
   "type": "hello",
   "version": 1,
   "device_id": "esp32-001",
-  "token": "test",
+  "token": "<DEVICE_TOKEN_SECRET>",
   "transport": "websocket",
   "audio_params": {
     "format": "opus",

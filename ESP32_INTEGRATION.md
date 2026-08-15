@@ -8,11 +8,19 @@ Gateway đã sẵn sàng nhận kết nối từ firmware ESP32 của bạn. Kh�
 ws://<PC_IP>:8888/ws
 ```
 
+Internet (Cloudflare Named Tunnel, hostname cố định):
+
+```
+wss://voice.yourdomain.com/ws
+```
+
+Khi `REQUIRE_DEVICE_TOKEN=true`, field `token` trong hello phải trùng `DEVICE_TOKEN_SECRET`. Loopback (`127.0.0.1`, không qua proxy) được miễn. Xem [SETUP.md](./SETUP.md) mục 4b.
+
 ## Protocol (ESP32 → Gateway)
 
 ### 1. hello (JSON)
 ```json
-{ "type": "hello", "device_id": "esp32-001", "token": "test" }
+{ "type": "hello", "device_id": "esp32-001", "token": "<DEVICE_TOKEN_SECRET>" }
 ```
 Gateway trả:
 ```json

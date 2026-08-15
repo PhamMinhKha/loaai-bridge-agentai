@@ -15,6 +15,9 @@ export const config = {
     tlsCertPath: process.env.TLS_CERT_PATH || "",
     tlsKeyPath: process.env.TLS_KEY_PATH || "",
 
+    publicEnabled: process.env.PUBLIC_ENABLED === "true",
+    publicHostname: (process.env.PUBLIC_HOSTNAME || "").trim(),
+
     openclaw: {
         url: process.env.OPENCLAW_URL || "http://127.0.0.1:18789",
         token: process.env.OPENCLAW_TOKEN || "",

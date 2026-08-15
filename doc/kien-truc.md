@@ -23,6 +23,9 @@ src/
   server/
     websocket.js           # Protocol gốc (hello không có audio_params opus/pcm)
     xiaozhi.js             # Protocol xiaozhi-esp32 (hello có audio_params.format)
+  runtime/
+    clientAddress.js       # loopback vs Cloudflare/proxy headers
+    deviceAuth.js          # hello.token khi REQUIRE_DEVICE_TOKEN
   protocol/messages.js     # Builder JSON phía protocol gốc
   sessions/sessionManager.js
   agents/                  # mock | openclaw | hermes
@@ -50,7 +53,7 @@ public/index.html          # Test bench: mic PCM + text, handshake xiaozhi
 
 `sessionManager.js` giữ `Map(deviceId → { sessionId, deviceId, createdAt, state })` **in-memory**. Mất khi restart. `sessionId` là UUID, gửi cho client và agent.
 
-`REQUIRE_DEVICE_TOKEN` / `DEVICE_TOKEN_SECRET` đã có trong config nhưng **chưa được kiểm tra** trên handshake.
+`REQUIRE_DEVICE_TOKEN=true`: handshake `hello` từ client remote (kể cả qua Cloudflare Tunnel) phải gửi `token` trùng `DEVICE_TOKEN_SECRET`. Loopback trực tiếp (Tauri / `node test/…`) được miễn. Request qua tunnel bị coi là remote nhờ header `CF-Connecting-IP` / `X-Forwarded-For` ([`clientAddress.js`](../src/runtime/clientAddress.js)). `/api/options` và `/api/conversations` chỉ gọi được từ loopback.
 
 ## Agent
 
@@ -78,6 +81,9 @@ Interface: `sendMessage({ sessionId, text }) → { text }`. `streamMessage` khai
 | Biến | Mặc định | Ý nghĩa |
 |------|----------|---------|
 | `PORT` | `8888` | HTTP/WS |
+| `HOST` | `0.0.0.0` | `127.0.0.1` khi dùng Cloudflare Tunnel |
+| `REQUIRE_DEVICE_TOKEN` | `false` | Bắt buộc `hello.token` với client remote |
+| `DEVICE_TOKEN_SECRET` | — | Secret so khớp token |
 | `AGENT_PROVIDER` | `mock` | `mock` \| `openclaw` \| `hermes` |
 | `OPENCLAW_URL` / `TOKEN` | — | Backend OpenClaw |
 | `HERMES_URL` / `TOKEN` | — | Backend Hermes |

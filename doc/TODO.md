@@ -89,7 +89,7 @@ Cập nhật sau khi làm P0 trong code. Mục **Test thật** (máy có Edge/Op
 
 - [ ] Streaming TTS
 - [ ] `streamMessage` trên Agent
-- [ ] `REQUIRE_DEVICE_TOKEN`
+- [x] `REQUIRE_DEVICE_TOKEN` — enforce hello.token với client remote; loopback miễn
 - [ ] STT worker theo session
 - [x] Xiaozhi lấy `device_id` từ hello nếu có
 - [ ] Xiaozhi: `audio_end` / `interrupt`

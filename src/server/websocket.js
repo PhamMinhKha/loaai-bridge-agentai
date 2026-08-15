@@ -13,6 +13,7 @@ import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
 import { getStt } from "../runtime/sttRuntime.js";
 import { getTlsProvisionPayload } from "../runtime/tlsSetup.js";
+import { checkDeviceHello, remoteRequiresAuth } from "../runtime/deviceAuth.js";
 
 const VOICE_ENERGY = 200;
 const PARTIAL_ENABLED = (process.env.PARTIAL_ENABLED || "false").toLowerCase() === "true";
@@ -34,9 +35,11 @@ export function createWebSocketServer(server, opts = {}) {
     const SILENCE_MS = Number(opts.silenceMs || process.env.SILENCE_MS || 1200);
     const LISTEN_MS = Number(opts.listenMs || process.env.LISTEN_MS || 30000);
 
-    wss.on("connection", (socket) => {
+    wss.on("connection", (socket, req) => {
         let deviceId = null;
         let session = null;
+        let authed = false;
+        const needsAuth = remoteRequiresAuth(req);
         let silenceTimer = null;
         let listenTimer = null;
         let partialTimer = null;
@@ -202,6 +205,7 @@ export function createWebSocketServer(server, opts = {}) {
         socket.on("message", async (data, isBinary) => {
             try {
                 if (isBinary) {
+                    if (needsAuth && !authed) return;
                     getStt().push(data);
                     const energy = pcmChunkEnergy(data);
                     if (energy > 0) console.log("[vad] energy", energy.toFixed(0), "voiceStarted", voiceStarted);
@@ -224,7 +228,15 @@ export function createWebSocketServer(server, opts = {}) {
                 }
                 const message = JSON.parse(data.toString());
                 switch (message.type) {
-                    case "hello":
+                    case "hello": {
+                        const auth = checkDeviceHello(message, req);
+                        if (!auth.ok) {
+                            console.warn("[ws] hello rejected", auth.code, message.device_id || "");
+                            send(msg.error(auth.code, auth.message));
+                            try { socket.close(); } catch { /* ignore */ }
+                            return;
+                        }
+                        authed = true;
                         if (message.agent || message.tts || message.voice) {
                             prefs = mergePrefs(prefs, message);
                         }
@@ -240,8 +252,10 @@ export function createWebSocketServer(server, opts = {}) {
                         send(msg.helloAck(deviceId, session.sessionId, getTlsProvisionPayload() || {}));
                         send({ type: "config_ok", ...prefs });
                         break;
+                    }
 
                     case "config":
+                        if (needsAuth && !authed) throw new Error("Device not authenticated");
                         applyClientPrefs(message);
                         break;
 
@@ -251,6 +265,7 @@ export function createWebSocketServer(server, opts = {}) {
                         break;
 
                     case "screenshot":
+                        if (needsAuth && !authed) throw new Error("Device not authenticated");
                         try {
                             await sendScreenshot(send, message, { compact: false });
                         } catch (e) {
@@ -259,6 +274,7 @@ export function createWebSocketServer(server, opts = {}) {
                         break;
 
                     case "audio_start":
+                        if (needsAuth && !authed) throw new Error("Device not authenticated");
                         getStt().reset();
                         voiceStarted = false;
                         clearSilence();
@@ -267,10 +283,12 @@ export function createWebSocketServer(server, opts = {}) {
                         break;
 
                     case "audio_end":
+                        if (needsAuth && !authed) throw new Error("Device not authenticated");
                         await finalizeAudio();
                         break;
 
                     case "interrupt":
+                        if (needsAuth && !authed) throw new Error("Device not authenticated");
                         clearSilence(); clearListen();
                         getStt().reset();
                         voiceStarted = false;

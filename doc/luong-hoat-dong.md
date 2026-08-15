@@ -92,7 +92,7 @@ Client:
 { "type": "hello", "device_id": "esp32-001", "token": "test" }
 ```
 
-Server: `hello_ack` + `session_id`. Chưa verify token.
+Server: `hello_ack` + `session_id`. Khi `REQUIRE_DEVICE_TOKEN=true`, client remote phải gửi `token` trùng `DEVICE_TOKEN_SECRET` (loopback được miễn). Sai/thiếu → `AUTH_INVALID` / `AUTH_REQUIRED` rồi đóng socket.
 
 ### 4.2 Luồng mic → trả lời
 

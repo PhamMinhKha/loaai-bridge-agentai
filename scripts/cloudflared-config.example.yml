@@ -1,0 +1,11 @@
+# Copy tới %USERPROFILE%\.cloudflared\config.yml
+# Thay UUID, đường dẫn credentials, và hostname.
+# Chi tiết: SETUP.md mục "Cloudflare Tunnel"
+
+tunnel: <UUID>
+credentials-file: C:\Users\Admin\.cloudflared\<UUID>.json
+
+ingress:
+  - hostname: voice.yourdomain.com
+    service: http://127.0.0.1:8888
+  - service: http_status:404

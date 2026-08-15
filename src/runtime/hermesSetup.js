@@ -16,10 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VG_ROOT = path.join(__dirname, "..", "..");
 const VG_ENV = path.join(VG_ROOT, ".env");
 
-export function isLoopback(req) {
-    const ip = req.socket?.remoteAddress || "";
-    return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-}
+export { isLoopback } from "./clientAddress.js";
 
 function hermesHome() {
     if (process.env.HERMES_HOME) return process.env.HERMES_HOME;

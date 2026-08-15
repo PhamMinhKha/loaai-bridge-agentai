@@ -14,3 +14,4 @@ Chạy: xem [SETUP.md](../SETUP.md) (script `npm run setup:dev`, `npm run dev`, 
 - HTTP: `http://localhost:8888` (trang test `public/index.html`)
 - Health: `GET /health`
 - WebSocket: `ws://<host>:8888/ws`
+- Internet (hostname cố định): [SETUP.md](../SETUP.md) mục Cloudflare Tunnel — `wss://voice.yourdomain.com/ws`

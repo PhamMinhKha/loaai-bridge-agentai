@@ -81,6 +81,35 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - State ESP32/text: sau TTS chuyển `speaking` → `listening` (chờ câu tiếp).
 - Message state dùng `{type:"state", state:"..."}` thay vì `{type:"idle"}`.
 
+### Added (Cloudflare Tunnel — internet công khai)
+- **`src/runtime/cloudflareTunnel.js`**: tự cài `cloudflared` (winget), login CF, tạo tunnel,
+  ghi `config.yml`, trỏ DNS, chạy tunnel, test URL công khai, cài Windows service;
+  `setupTunnelAuto` (bước 4→8), `setupTunnelFull` (một lần bấm), `buildEsp32HelloConfig`.
+- API tunnel (loopback-only): `GET /api/tunnel/status`, `POST /api/tunnel/setup-full`,
+  `POST /api/tunnel/setup-auto`, `GET /api/tunnel/esp32-config`, và các endpoint từng bước
+  (write-config, route-dns, create, start/stop, install-service, test-public).
+- **`src/runtime/deviceAuth.js`**: bắt buộc `hello.token` khi `REQUIRE_DEVICE_TOKEN=true`;
+  loopback được miễn.
+- **`src/runtime/clientAddress.js`**: nhận diện client qua Cloudflare proxy headers.
+- Chặn `/api/options`, `/api/conversations` và API quản trị khỏi non-loopback khi bật internet.
+- **Web UI** (tab Cài đặt → Internet): hostname cố định, device token, áp dụng & restart;
+  modal hướng dẫn với **Thiết lập tự động (1 lần bấm)**, **Kiểm tra trạng thái**, copy JSON ESP32.
+- `scripts/cloudflared-config.example.yml`, cập nhật `SETUP.md`, `.env.example` (`HOST`, `PUBLIC_*`,
+  `CLOUDFLARED_PATH`, `REQUIRE_DEVICE_TOKEN`).
+- Test: `test/test_cloudflare_tunnel.js`, `test/test_device_auth.js`.
+- `/health` thêm `features.apiVersion` (desktop app phát hiện gateway cũ).
+
+### Changed (Cloudflare Tunnel)
+- Gateway bind **`HOST=127.0.0.1`** khi bật `PUBLIC_ENABLED`; tắt WSS tự ký — Cloudflare cấp HTTPS/WSS.
+- Tauri dev: luôn dùng repo gốc (không snapshot `gateway-bundle` cũ); tự kill gateway thiếu
+  `apiVersion` mới trên port 8888.
+- Tìm `cloudflared.exe` tại `Program Files (x86)`, WinGet Packages; tự `winget --force` khi
+  winget báo đã cài nhưng thiếu file; lưu `CLOUDFLARED_PATH` vào `.env`.
+
+### Fixed (Cloudflare Tunnel)
+- Gateway cũ chiếm port 8888 khiến UI báo "Server trả HTML" — detect qua `apiVersion` và restart.
+- Spawn `cloudflared` với đường dẫn có khoảng trắng (`Program Files (x86)`).
+
 ## [Initial] — ESP32-S3 xiaozhi protocol
 - Dual flow (audio Opus/PCM + text), 2-tab web test bench, Opus codec,
   venv311 Whisper fix.
