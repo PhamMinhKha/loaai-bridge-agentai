@@ -213,7 +213,7 @@
   /* Forms */
   .cfg { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem 1rem; }
   .cfg label { display: block; font-size: .75rem; font-weight: 500; color: var(--text-muted); margin-bottom: .3rem; }
-  .cfg select, .cfg input[type=text], .cfg input[type=password], .cfg input[type=number], .port-field input[type=number], .text-row input {
+  .cfg select, .cfg input[type=text], .cfg input[type=password], .cfg input[type=number], .port-field input[type=number], .port-field input[type=text], .text-row input, .text-row textarea {
     width: 100%; padding: .55rem .7rem;
     background: var(--bg-input); border: 1px solid var(--border);
     border-radius: var(--radius-sm); color: var(--text); font-size: .88rem;
@@ -275,7 +275,7 @@
     color: #fff;
   }
   .cfg select option:disabled { color: var(--text-faint); }
-  .cfg select:focus, .cfg input:focus, .port-field input:focus, .text-row input:focus {
+  .cfg select:focus, .cfg input:focus, .port-field input:focus, .text-row input:focus, .text-row textarea:focus {
     outline: none; border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
@@ -321,6 +321,16 @@
     margin: -.1rem 0 .15rem;
   }
   .port-field input[type=number] { width: auto; flex: 0 0 7.5rem; max-width: 7.5rem; }
+  .port-field input[type=text] { flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .82rem; }
+  .port-field .urlrow { margin: 0; flex: 1; min-width: 0; }
+  .port-field .urlrow input { flex: 1; min-width: 0; }
+  .port-field .urlrow .copybtn-inline {
+    flex-shrink: 0; position: static;
+    background: var(--bg-input); color: var(--text-muted);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: .45rem .65rem; font-size: .75rem; cursor: pointer;
+  }
+  .port-field .urlrow .copybtn-inline:hover { border-color: var(--border-strong); color: var(--text); }
   .port-actions { margin-top: 0; }
   .cfg .full { grid-column: 1 / -1; }
   .check-row { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--text-muted); cursor: pointer; }
@@ -359,8 +369,13 @@
   .ai { color: #86efac; } .sys { color: #94a3b8; }
 
   /* Text chat row */
-  .text-row { display: flex; gap: .5rem; align-items: center; }
-  .text-row input { flex: 1; }
+  .text-row { display: flex; gap: .5rem; align-items: flex-end; }
+  .text-row input, .text-row textarea { flex: 1; }
+  .text-row textarea {
+    min-height: 2.75rem; max-height: 10rem; resize: vertical;
+    line-height: 1.45; font-family: inherit;
+  }
+  .text-row-hint { font-size: .72rem; color: var(--text-faint); margin-top: .35rem; }
 
   audio { width: 100%; margin-top: .65rem; }
 
@@ -587,9 +602,10 @@
       <h2 class="card-title">Chat văn bản</h2>
       <p class="card-desc">Gõ lệnh → Agent → TTS, không cần mic.</p>
       <div class="text-row">
-        <input type="text" id="textInput" placeholder="Ví dụ: mở đèn phòng khách" />
+        <textarea id="textInput" rows="2" placeholder="Ví dụ: mở đèn phòng khách"></textarea>
         <button class="btn-primary" id="send">Gửi</button>
       </div>
+      <p class="text-row-hint">Enter gửi · Shift+Enter xuống dòng</p>
       <div class="log" id="logT"></div>
       <audio id="playerT" controls hidden></audio>
     </div>
@@ -762,6 +778,31 @@ HERMES_URL=http://127.0.0.1:8642</code></div>
             <input type="number" id="inpPort" min="1024" max="65535" step="1" inputmode="numeric" placeholder="8888" />
           </div>
           <span class="port-range">1024 – 65535</span>
+        </div>
+        <div class="port-field">
+          <span class="port-badge">LAN</span>
+          <div class="port-row">
+            <label for="lanIpPreview" class="port-label">IP máy chủ</label>
+            <div class="urlrow">
+              <input type="text" id="lanIpPreview" readonly placeholder="Đang tải…" />
+              <button type="button" class="copybtn-inline" id="copyLanIp">Copy</button>
+            </div>
+          </div>
+          <div class="port-row" style="margin-top:.25rem">
+            <label for="lanHttpPreview" class="port-label">HTTP</label>
+            <div class="urlrow">
+              <input type="text" id="lanHttpPreview" readonly />
+              <button type="button" class="copybtn-inline" id="copyLanHttp">Copy</button>
+            </div>
+          </div>
+          <div class="port-row" style="margin-top:.25rem">
+            <label for="lanWsPreview" class="port-label">WebSocket</label>
+            <div class="urlrow">
+              <input type="text" id="lanWsPreview" readonly />
+              <button type="button" class="copybtn-inline" id="copyLanWs">Copy</button>
+            </div>
+          </div>
+          <span class="port-range">ESP32 và thiết bị khác trong LAN dùng IP này (không dùng localhost)</span>
         </div>
         <div class="port-actions btn-row">
           <button type="button" class="btn-primary" id="btnRestartServer">Áp dụng &amp; restart</button>
@@ -1072,6 +1113,36 @@ function updatePublicPreview() {
   if (wsEl) wsEl.value = host ? `wss://${host}/ws` : "wss://voice.yourdomain.com/ws";
 }
 
+function updateLanPreview(port, tlsEnabled, lanIps) {
+  const p = port || document.getElementById("inpPort")?.value || location.port || "8888";
+  const tls = tlsEnabled ?? document.getElementById("chkTlsEnabled")?.checked ?? serverState.tlsEnabled;
+  const ips = lanIps ?? serverState.lanIps ?? [];
+  const ipEl = document.getElementById("lanIpPreview");
+  const httpEl = document.getElementById("lanHttpPreview");
+  const wsEl = document.getElementById("lanWsPreview");
+  const hint = document.getElementById("portHint");
+  const scheme = tls ? "https" : "http";
+  const wsScheme = tls ? "wss" : "ws";
+  if (ipEl) {
+    ipEl.value = ips.length ? ips.join(", ") : "Không phát hiện IP LAN — kiểm tra Wi‑Fi / Ethernet";
+  }
+  if (httpEl) {
+    httpEl.value = ips.length
+      ? ips.map((ip) => `${scheme}://${ip}:${p}/`).join(" · ")
+      : `${scheme}://<IP-PC>:${p}/`;
+  }
+  if (wsEl) {
+    wsEl.value = ips.length
+      ? ips.map((ip) => `${wsScheme}://${ip}:${p}/ws`).join(" · ")
+      : `${wsScheme}://<IP-PC>:${p}/ws`;
+  }
+  if (hint && ips.length) {
+    hint.textContent = `Thiết bị trong LAN kết nối qua ${ips[0]}:${p}`;
+  } else if (hint && !ips.length) {
+    hint.textContent = "Không tìm thấy IP LAN — bật Wi‑Fi/Ethernet hoặc đặt HOST=0.0.0.0 trong .env";
+  }
+}
+
 function updateWsPreview(port, tlsEnabled, lanIps) {
   const p = port || document.getElementById("inpPort")?.value || location.port || "8888";
   const tls = tlsEnabled ?? document.getElementById("chkTlsEnabled")?.checked ?? serverState.tlsEnabled;
@@ -1092,6 +1163,7 @@ function updateWsPreview(port, tlsEnabled, lanIps) {
   }
   syncEsp32WsUrl(p, tls, ips);
   updateTlsCertUi(tls);
+  updateLanPreview(p, tls, ips);
 }
 
 function updateTlsCertUi(tlsEnabled) {
@@ -1198,6 +1270,10 @@ async function loadServerSettings() {
     updateWsPreview();
   }
 }
+
+document.getElementById("copyLanIp")?.addEventListener("click", (e) => copyText(document.getElementById("lanIpPreview").value, e.target));
+document.getElementById("copyLanHttp")?.addEventListener("click", (e) => copyText(document.getElementById("lanHttpPreview").value, e.target));
+document.getElementById("copyLanWs")?.addEventListener("click", (e) => copyText(document.getElementById("lanWsPreview").value, e.target));
 
 document.getElementById("inpPort")?.addEventListener("input", (e) => updateWsPreview(e.target.value));
 document.getElementById("chkTlsEnabled")?.addEventListener("change", () => {
@@ -2294,7 +2370,10 @@ document.getElementById("send").onclick = () => {
   }
 };
 document.getElementById("textInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); document.getElementById("send").click(); }
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById("send").click();
+  }
 });
 
 const tokenEl = document.getElementById("inpDeviceToken");

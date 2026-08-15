@@ -11,6 +11,7 @@ import { isScreenshotCommand, sendScreenshot } from "../runtime/screenshot.js";
 import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
 import { getStt } from "../runtime/sttRuntime.js";
 import { getTlsProvisionPayload } from "../runtime/tlsSetup.js";
+import { registerWsClient } from "./wsBroadcast.js";
 
 const VOICE_ENERGY = 200;
 const SILENCE_MS = 1200;
@@ -196,6 +197,13 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
     send({ type: "state", state: "listening" });
     armListen();
 
+    const unregisterBroadcast = registerWsClient((patch) => {
+        prefs = mergePrefs(prefs, patch);
+        if (socket.readyState === socket.OPEN) {
+            send({ type: "config_ok", ...prefs });
+        }
+    });
+
     let rxFrames = 0;
     socket.on("message", async (data, isBinary) => {
         try {
@@ -283,8 +291,11 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
     });
 
     socket.on("close", () => {
+        unregisterBroadcast();
         clearSilence(); clearListen();
         if (getStt().reset) getStt().reset();
         console.log("xiaozhi device disconnected:", deviceId);
     });
+
+    return unregisterBroadcast;
 }

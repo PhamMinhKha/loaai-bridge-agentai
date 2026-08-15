@@ -14,6 +14,7 @@ import { isGoodbyeCommand } from "../runtime/voiceCommands.js";
 import { getStt } from "../runtime/sttRuntime.js";
 import { getTlsProvisionPayload } from "../runtime/tlsSetup.js";
 import { checkDeviceHello, remoteRequiresAuth } from "../runtime/deviceAuth.js";
+import { registerWsClient } from "./wsBroadcast.js";
 
 const VOICE_ENERGY = 200;
 const PARTIAL_ENABLED = (process.env.PARTIAL_ENABLED || "false").toLowerCase() === "true";
@@ -46,8 +47,16 @@ export function createWebSocketServer(server, opts = {}) {
         let voiceStarted = false;
         let prefs = { ...getPrefs() };
         let pendingConvId = null;
+        let xiaozhiUnregister = null;
 
         const send = (obj) => sendJson(socket, obj, "ws");
+
+        const unregisterBroadcast = registerWsClient((patch) => {
+            prefs = mergePrefs(prefs, patch);
+            if (socket.readyState === socket.OPEN) {
+                send({ type: "config_ok", ...prefs });
+            }
+        });
 
         const applyClientPrefs = (patch) => {
             prefs = mergePrefs(prefs, patch);
@@ -242,9 +251,8 @@ export function createWebSocketServer(server, opts = {}) {
                         }
                         if (message.audio_params && (message.audio_params.format === "opus" || message.audio_params.format === "pcm")) {
                             const fmt = message.audio_params.format;
-                            socket.removeAllListeners("message");
-                            socket.removeAllListeners("close");
-                            handleXiaozhi(socket, fmt, prefs, { deviceId: message.device_id });
+                            unregisterBroadcast();
+                            xiaozhiUnregister = handleXiaozhi(socket, fmt, prefs, { deviceId: message.device_id });
                             return;
                         }
                         deviceId = message.device_id;
@@ -307,6 +315,8 @@ export function createWebSocketServer(server, opts = {}) {
         });
 
         socket.on("close", () => {
+            unregisterBroadcast();
+            xiaozhiUnregister?.();
             clearSilence(); clearListen();
             if (getStt().reset) getStt().reset();
             console.log("Device disconnected:", deviceId);

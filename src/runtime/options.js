@@ -123,6 +123,9 @@ export function applyGlobalOptions(patch = {}) {
         });
     }
 
+    if (state.agentProvider !== prev.agentProvider) {
+        upsertEnvFile(VG_ENV, { AGENT_PROVIDER: state.agentProvider });
+    }
     if (state.agentProvider !== prev.agentProvider ||
         state.openclaw.url !== prev.openclaw.url ||
         state.hermes.url !== prev.hermes.url) {

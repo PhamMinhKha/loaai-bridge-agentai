@@ -2,6 +2,20 @@
 
 Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 
+## [Unreleased] — 2026-08-16
+
+### Changed
+- Tab **Chat văn bản**: ô nhập đổi sang `<textarea>` nhiều dòng; **Enter** gửi, **Shift+Enter** xuống dòng.
+- Tab **⚙ Cài đặt → Cổng máy chủ**: hiển thị **IP LAN**, URL HTTP và WebSocket (copy được) cho ESP32 / thiết bị trong mạng.
+- Đổi agent qua UI ghi `AGENT_PROVIDER` vào `.env` (giữ sau restart gateway).
+
+### Added
+- **`wsBroadcast.js`**: broadcast cấu hình agent/STT/TTS tới mọi WebSocket đang kết nối (web + ESP32).
+
+### Fixed
+- ESP32 vẫn dùng **Mock** sau khi chuyển sang Hermes/OpenClaw trên web — kết nối cũ giữ prefs lúc hello;
+  giờ nhận `config_ok` ngay khi bấm **Áp dụng** (không cần reconnect).
+
 ## [Unreleased] — 2026-08-15
 
 ### Changed

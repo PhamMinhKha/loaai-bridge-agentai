@@ -6,6 +6,7 @@ import express from "express";
 import pkg from "../package.json" with { type: "json" };
 import { config } from "./config/config.js";
 import { createWebSocketServer } from "./server/websocket.js";
+import { broadcastConfig } from "./server/wsBroadcast.js";
 import { publicOptions, applyGlobalOptions, getPrefs } from "./runtime/options.js";
 import { isLoopback, setupHermesForVoiceGateway } from "./runtime/hermesSetup.js";
 import { setupOpenClawForVoiceGateway } from "./runtime/openclawSetup.js";
@@ -86,7 +87,8 @@ app.get("/api/options", async (req, res) => {
 app.post("/api/options", async (req, res) => {
     if (!requireLoopback(req, res)) return;
     try {
-        applyGlobalOptions(req.body || {});
+        const prefs = applyGlobalOptions(req.body || {});
+        broadcastConfig(prefs);
         res.json(await publicOptions());
     } catch (e) {
         res.status(500).json({ error: e.message });
