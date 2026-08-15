@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 const SR = 16000;
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 
 function sineChunk(freq = 440, ms = 200) {
   const n = (SR * ms) / 1000;

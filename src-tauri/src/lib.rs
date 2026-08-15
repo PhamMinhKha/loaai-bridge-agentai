@@ -3,8 +3,10 @@ mod gateway;
 mod tray;
 
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
-use gateway::{bundled_root, GatewayProcess};
+use gateway::{bundled_root, GatewayProcess, SharedGateway};
 use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
@@ -21,7 +23,7 @@ pub fn run() {
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
-        .unwrap_or(3000);
+        .unwrap_or(8888);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::Builder::new().build())
@@ -39,11 +41,17 @@ pub fn run() {
                 let gateway = Arc::new(GatewayProcess::new(root, port));
                 app.manage(gateway.clone());
 
-                gateway
-                    .ensure_running()
-                    .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
-                let url = gateway.app_url();
-                tray::create_main_window(app.handle(), &url)?;
+                match gateway.ensure_running() {
+                    Ok(()) => {
+                        open_app_window(app.handle(), &gateway)?;
+                    }
+                    Err(e) => {
+                        eprintln!("[gateway] {e}");
+                        gateway::show_error_dialog("Loa Ai Agent Bridge", &e);
+                        open_app_window(app.handle(), &gateway)?;
+                        schedule_webview_reload(app.handle().clone(), gateway.clone());
+                    }
+                }
                 tray::setup_tray(app.handle(), gateway)?;
                 Ok(())
             }
@@ -57,4 +65,24 @@ pub fn run() {
                 }
             }
         });
+}
+
+fn open_app_window(app: &tauri::AppHandle, gateway: &SharedGateway) -> tauri::Result<()> {
+    tray::create_main_window(app, &gateway.app_url())
+}
+
+fn schedule_webview_reload(app: tauri::AppHandle, gateway: SharedGateway) {
+    thread::spawn(move || {
+        for _ in 0..90 {
+            if gateway.wait_healthy(1) {
+                let url = gateway.app_url();
+                let app_handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    tray::navigate_main_window(&app_handle, &url);
+                });
+                break;
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
 }

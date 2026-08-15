@@ -62,9 +62,9 @@ npm run dev
 
 Mở:
 
-- UI test: http://localhost:3000
-- Health: http://localhost:3000/health
-- WebSocket: `ws://localhost:3000/ws`
+- UI test: http://localhost:8888
+- Health: http://localhost:8888/health
+- WebSocket: `ws://localhost:8888/ws`
 
 Đổi Agent / TTS ngay trên UI (không cần restart). STT Whisper vẫn lấy từ `.env`.
 
@@ -82,11 +82,11 @@ npm start
 
 Gợi ý:
 
-- `PORT` — cổng HTTP/WS (mặc định 3000)
+- `PORT` — cổng HTTP/WS (mặc định 8888)
 - `STT_PROVIDER=whisper` và `WHISPER_MODEL` phù hợp máy (CPU: `base` / `small`; mạnh hơn: `medium`)
 - `TTS_PROVIDER=edge` hoặc `google` (cần mạng) hoặc `pyttsx3` (Windows offline)
 - `AGENT_PROVIDER=openclaw` hoặc `hermes` + URL/token
-- Firewall: mở `PORT` trên LAN nếu ESP32 kết nối `ws://<IP_PC>:3000/ws`
+- Firewall: mở `PORT` trên LAN nếu ESP32 kết nối `ws://<IP_PC>:8888/ws`
 
 Process manager (tùy chọn):
 
@@ -123,7 +123,7 @@ File mẫu: [`.env.example`](./.env.example). Không commit `.env`.
 
 | Biến | Mặc định | Ý nghĩa |
 |------|----------|---------|
-| `PORT` | `3000` | HTTP + WebSocket |
+| `PORT` | `8888` | HTTP + WebSocket |
 | `TLS_ENABLED` | `false` | Bật HTTPS/WSS cho LAN (ESP32). Localhost vẫn `http`/`ws` |
 | `TLS_CERT_PATH` | `data/tls/gateway.crt` | Cert PEM (tự sinh nếu trống) |
 | `TLS_KEY_PATH` | `data/tls/gateway.key` | Private key PEM |

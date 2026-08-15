@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 let gotHello = false, gotStt = false, gotTts = false, gotLlm = false, ttsBytes = 0;
 
 ws.on("open", () => {

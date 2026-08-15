@@ -9,7 +9,7 @@ const off = b.indexOf(Buffer.from("data"));
 const pcmLen = b.readUInt32LE(off + 4);
 const pcm = b.subarray(off + 8, off + 8 + pcmLen);
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 let gotStt = false, gotLlm = false, gotTts = false, ttsBytes = 0;
 
 ws.on("open", () => {

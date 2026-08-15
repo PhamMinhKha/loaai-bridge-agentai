@@ -56,7 +56,10 @@ pub fn setup_tray(app: &AppHandle, gateway: SharedGateway) -> tauri::Result<()> 
         .menu(&menu)
         .tooltip(APP_TITLE)
         .on_menu_event(move |app, event| match event.id.as_ref() {
-            "show" => show_main_window(app),
+            "show" => {
+                let url = gw.app_url();
+                navigate_main_window(app, &url);
+            }
             "autostart" => {
                 match autostart::toggle_autostart(app) {
                     Ok(enabled) => {
@@ -81,6 +84,9 @@ pub fn setup_tray(app: &AppHandle, gateway: SharedGateway) -> tauri::Result<()> 
             } = event
             {
                 show_main_window(tray.app_handle());
+                if let Some(gw) = tray.app_handle().try_state::<SharedGateway>() {
+                    navigate_main_window(tray.app_handle(), &gw.app_url());
+                }
             }
         })
         .build(app)?;
@@ -95,13 +101,28 @@ pub fn sync_tray_autostart(app: &AppHandle, enabled: bool) -> tauri::Result<()> 
     Ok(())
 }
 
-pub fn show_main_window(app: &AppHandle) {
+pub fn navigate_main_window(app: &AppHandle, url: &str) {
     if let Some(win) = app.get_webview_window("main") {
         #[cfg(target_os = "macos")]
         let _ = app.set_dock_visibility(true);
         let _ = win.show();
         let _ = win.unminimize();
+        if let Ok(parsed) = url.parse::<tauri::Url>() {
+            let _ = win.navigate(parsed);
+        }
         let _ = win.set_focus();
+    }
+}
+
+pub fn show_main_window(app: &AppHandle) {
+    if app.get_webview_window("main").is_some() {
+        let _ = app.get_webview_window("main").map(|win| {
+            #[cfg(target_os = "macos")]
+            let _ = app.set_dock_visibility(true);
+            let _ = win.show();
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+        });
     }
 }
 
@@ -118,6 +139,7 @@ fn hide_main_window(_app: &AppHandle, win: &tauri::WebviewWindow) {
 
 pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
     if app.get_webview_window("main").is_some() {
+        navigate_main_window(app, url);
         return Ok(());
     }
     let app_handle = app.clone();

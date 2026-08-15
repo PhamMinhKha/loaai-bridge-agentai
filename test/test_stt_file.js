@@ -25,7 +25,7 @@ while (off < buf.length - 8) {
 if (dataStart < 0) { console.error("No data chunk"); process.exit(1); }
 const pcm = buf.subarray(dataStart, dataStart + dataLen);
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 ws.on("open", () => {
   ws.send(JSON.stringify({ type: "hello", device_id: "stt-test-001", token: "x" }));
   setTimeout(() => {

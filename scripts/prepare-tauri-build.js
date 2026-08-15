@@ -36,6 +36,11 @@ for (const f of ["package.json", "package-lock.json", "requirements.txt", ".env.
     const src = path.join(ROOT, f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(OUT, f));
 }
+// Bundled app reads PORT from env at runtime; ship .env as fallback for direct node runs.
+const envExample = path.join(OUT, ".env.example");
+if (fs.existsSync(envExample)) {
+    fs.copyFileSync(envExample, path.join(OUT, ".env"));
+}
 
 console.log("npm ci --omit=dev trong gateway-bundle…");
 const r = spawnSync("npm", ["ci", "--omit=dev"], { cwd: OUT, stdio: "inherit", shell: process.platform === "win32" });

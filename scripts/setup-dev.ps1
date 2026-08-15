@@ -1,4 +1,5 @@
-# Cài môi trường development Loa Ai Agent Bridge (Windows PowerShell).
+# Cai moi truong development Loa Ai Agent Bridge (Windows PowerShell).
+# ASCII-only strings: Windows PowerShell 5.1 parses .ps1 as ANSI unless UTF-8 BOM.
 $ErrorActionPreference = "Stop"
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -8,24 +9,24 @@ function Write-Info($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg) { Write-Host $msg -ForegroundColor Green }
 function Write-Err($msg) { Write-Host $msg -ForegroundColor Red }
 
-Write-Info "Thư mục dự án: $Root"
+Write-Info "Thu muc du an: $Root"
 
 function Get-Cmd($name) {
     Get-Command $name -ErrorAction SilentlyContinue
 }
 
 if (-not (Get-Cmd "node")) {
-    Write-Err "Chưa có Node.js. Cài Node 18+ từ https://nodejs.org rồi mở lại PowerShell."
+    Write-Err "Chua co Node.js. Cai Node 18+ tu https://nodejs.org roi mo lai PowerShell."
     exit 1
 }
 if (-not (Get-Cmd "npm")) {
-    Write-Err "Chưa có npm (đi kèm Node.js)."
+    Write-Err "Chua co npm (di kem Node.js)."
     exit 1
 }
 
 $nodeMajor = [int]((node -p "process.versions.node.split('.')[0]").Trim())
 if ($nodeMajor -lt 18) {
-    Write-Err "Cần Node.js >= 18 (đang có $(node -v))"
+    Write-Err "Can Node.js >= 18 (dang co $(node -v))"
     exit 1
 }
 Write-Ok "Node $(node -v) / npm $(npm -v)"
@@ -35,7 +36,7 @@ foreach ($c in @("python", "py")) {
     if (Get-Cmd $c) { $py = $c; break }
 }
 if (-not $py) {
-    Write-Err "Chưa có Python 3.10+. Cài từ https://www.python.org (tick Add python.exe to PATH)."
+    Write-Err "Chua co Python 3.10+. Cai tu https://www.python.org (tick Add python.exe to PATH)."
     exit 1
 }
 if ($py -eq "py") { $pyArgs = @("-3") } else { $pyArgs = @() }
@@ -43,12 +44,12 @@ Write-Ok (& $py @pyArgs --version 2>&1 | Out-String).Trim()
 
 Write-Info "npm install"
 npm install
-if ($LASTEXITCODE -ne 0) { throw "npm install thất bại. Trên Windows có thể cần Visual Studio Build Tools để compile @discordjs/opus." }
+if ($LASTEXITCODE -ne 0) { throw "npm install that bai. Tren Windows co the can Visual Studio Build Tools de compile @discordjs/opus." }
 
 $venv = Join-Path $Root ".venv"
 $venvPy = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path $venvPy)) {
-    Write-Info "Tạo virtualenv .venv"
+    Write-Info "Tao virtualenv .venv"
     & $py @pyArgs -m venv $venv
 }
 Write-Info "pip install -r requirements.txt"
@@ -58,7 +59,7 @@ Write-Info "pip install -r requirements.txt"
 $envFile = Join-Path $Root ".env"
 $example = Join-Path $Root ".env.example"
 if (-not (Test-Path $envFile)) {
-    Write-Info "Tạo .env từ .env.example"
+    Write-Info "Tao .env tu .env.example"
     Copy-Item $example $envFile
 }
 
@@ -74,13 +75,13 @@ if (-not $seenW) { $out += "WHISPER_PYTHON=$venvPy" }
 if (-not $seenT) { $out += "TTS_PYTHON=$venvPy" }
 $utf8 = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllLines($envFile, $out, $utf8)
-Write-Ok "Đã trỏ WHISPER_PYTHON / TTS_PYTHON -> $venvPy"
+Write-Ok "Da tro WHISPER_PYTHON / TTS_PYTHON -> $venvPy"
 
 Write-Host ""
-Write-Ok "Cài đặt dev xong."
-Write-Host "  Phát triển (tự reload):  npm run dev"
+Write-Ok "Cai dat dev xong."
+Write-Host "  Phat trien (tu reload):  npm run dev"
 Write-Host "  Production:              npm start"
-Write-Host "  Trang test:              http://localhost:3000"
+Write-Host "  Trang test:              http://localhost:8888"
 Write-Host ""
-Write-Host "Mặc định agent=mock. OpenClaw/Hermes: sửa .env rồi restart."
-Write-Host "Hướng dẫn đầy đủ: SETUP.md"
+Write-Host "Mac dinh agent=mock. OpenClaw/Hermes: sua .env roi restart."
+Write-Host "Huong dan day du: SETUP.md"

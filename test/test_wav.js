@@ -41,7 +41,7 @@ function readWavPCM16(path) {
 const pcm = readWavPCM16(WAV);
 console.log("PCM bytes:", pcm.length, "≈", (pcm.length / 2 / SR).toFixed(1), "s");
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 // send in 200ms chunks
 const CHUNK = SR * 2 * 0.2;
 ws.on("open", () => {

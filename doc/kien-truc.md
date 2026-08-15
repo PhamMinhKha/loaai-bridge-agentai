@@ -42,7 +42,7 @@ public/index.html          # Test bench: mic PCM + text, handshake xiaozhi
 3. `StreamingSTT` luôn được tạo (Whisper stream nếu `STT_PROVIDER=whisper`).
 4. TTS: `edge-tts` → `EdgeTTS`; `pyttsx3` → `Pyttsx3TTS`; còn lại → `TTSManager` (no-op/`none`).
 5. `createWebSocketServer(httpServer, agent, stt, tts, { silenceMs, listenMs })`.
-6. Listen `PORT` (mặc định 3000).
+6. Listen `PORT` (mặc định 8888).
 
 **Lưu ý:** một instance `StreamingSTT` dùng chung cho mọi socket. Worker Python là single-thread FIFO — nhiều client đồng thời sẽ xếp hàng trên cùng một process Whisper.
 
@@ -77,7 +77,7 @@ Interface: `sendMessage({ sessionId, text }) → { text }`. `streamMessage` khai
 
 | Biến | Mặc định | Ý nghĩa |
 |------|----------|---------|
-| `PORT` | `3000` | HTTP/WS |
+| `PORT` | `8888` | HTTP/WS |
 | `AGENT_PROVIDER` | `mock` | `mock` \| `openclaw` \| `hermes` |
 | `OPENCLAW_URL` / `TOKEN` | — | Backend OpenClaw |
 | `HERMES_URL` / `TOKEN` | — | Backend Hermes |

@@ -9,7 +9,7 @@ nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge x�
 ## 1. Chuẩn bị
 
 ### 1.1 PC (chạy Gateway)
-- Gateway đã chạy: `node src/index.js` → lắng nghe `http://<PC_IP>:3000`
+- Gateway đã chạy: `node src/index.js` → lắng nghe `http://<PC_IP>:8888`
 - ESP32 và PC **cùng mạng LAN** (WiFi hoặc Ethernet).
 - Lấy IP của PC (cmd: `ipconfig` → IPv4, ví dụ `192.168.1.132`).
 
@@ -25,8 +25,8 @@ nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge x�
 | Thông số | Giá trị | Ghi chú |
 |----------|---------|---------|
 | Protocol | WebSocket | |
-| URL (mặc định) | `ws://<PC_IP>:3000/ws` | Port lấy từ `PORT` trong `.env` |
-| URL (WSS bật) | `wss://<PC_IP>:3000/ws` | Bật trong tab **Cài đặt** → **WSS cho LAN** |
+| URL (mặc định) | `ws://<PC_IP>:8888/ws` | Port lấy từ `PORT` trong `.env` |
+| URL (WSS bật) | `wss://<PC_IP>:8888/ws` | Bật trong tab **Cài đặt** → **WSS cho LAN** |
 | Audio format | **Opus** | Gateway decode Opus → PCM16 rồi chạy Whisper |
 | Sample rate | `16000` Hz | |
 | Channels | `1` (mono) | |
@@ -39,7 +39,7 @@ nói chuyện với **Loa Ai Agent Bridge** chạy trên PC (Windows). Bridge x�
 ### 2.1 WSS (bảo mật LAN)
 
 1. Mở Loa Ai Agent Bridge → tab **Cài đặt** → bật **WSS cho LAN** → restart.
-2. ESP32 dùng `wss://<PC_IP>:3000/ws` thay `ws://`.
+2. ESP32 dùng `wss://<PC_IP>:8888/ws` thay `ws://`.
 3. **Tự nhận cert (khuyến nghị)** — không cần embed vào firmware:
    - Lần đầu: kết nối WSS với **bỏ qua verify cert** (insecure / `setInsecure()`).
    - Gateway gửi ngay trong JSON `hello` / `hello_ack`:
@@ -69,7 +69,7 @@ if (cJSON_GetObjectItem(root, "tls_cert")) {
 
 ```
 ESP32                                          Gateway (PC)
-  |---- WebSocket connect ws://<PC_IP>:3000/ws -->|
+  |---- WebSocket connect ws://<PC_IP>:8888/ws -->|
   |                                               |
   |<--- server hello {type:"hello", session_id,   |
   |                 audio_params{sr:16000,frame:60}}|
@@ -177,7 +177,7 @@ ESP32 xử lý các message JSON sau:
 File `D:\voice-gateway\.env` (mẫu xem `.env.example`):
 
 ```ini
-PORT=3000
+PORT=8888
 
 # STT: Whisper local (không cần mạng)
 STT_PROVIDER=whisper
@@ -207,13 +207,13 @@ PARTIAL_ENABLED=false           # STT từng phần (tắt để giảm latency)
 cd D:\voice-gateway
 npm install
 node src/index.js
-# log: "Loa Ai Agent Bridge listening on :3000 (agent=mock)"
+# log: "Loa Ai Agent Bridge listening on :8888 (agent=mock)"
 ```
 
 ### ESP32 (flash)
 1. Build firmware `xiaozhi-esp32` với config:
    - WiFi SSID/pass (cùng LAN với PC).
-   - WebSocket server: `ws://<PC_IP>:3000/ws`
+   - WebSocket server: `ws://<PC_IP>:8888/ws`
    - Audio: Opus, 16kHz, mono, 60ms frame.
 2. Flash & monitor:
    ```bash
@@ -222,7 +222,7 @@ node src/index.js
 3. Nói vào mic ESP32 → nghe tiếng trả lời từ speaker.
 
 ### Kiểm tra nhanh qua Web (không cần ESP32)
-Mở `http://<PC_IP>:3000` → tab **Flow 1 (Mic)** hoặc **Flow 2 (Text)** để test
+Mở `http://<PC_IP>:8888` → tab **Flow 1 (Mic)** hoặc **Flow 2 (Text)** để test
 Gateway trước. Tab **📖 Cấu hình ESP32** có sẵn bản hướng dẫn này trên giao diện.
 
 ---
@@ -242,7 +242,7 @@ Gateway trước. Tab **📖 Cấu hình ESP32** có sẵn bản hướng dẫn 
 
 ## 10. Tóm tắt các điểm cốt lõi để code firmware
 
-1. Connect `ws://<PC_IP>:3000/ws`.
+1. Connect `ws://<PC_IP>:8888/ws`.
 2. Nhận server hello → gửi client hello có `audio_params.format="opus"`.
 3. Khi Gateway báo `state:"listening"` → thu mic, encode Opus 60ms/frame, gửi binary.
 4. Khi Gateway báo `state:"speaking"` → decode Opus binary thành PCM, phát speaker.

@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 const SR = 16000;
 function sineChunk(freq=440, ms=200){
   const n=(SR*ms)/1000; const b=Buffer.alloc(n*2); const v=new Int16Array(b.buffer,b.byteOffset,n);

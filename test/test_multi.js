@@ -35,7 +35,7 @@ const pcm = resample(pcmToFloat(readWavPCM16(path.join(__dirname, "fixtures", "t
 const CHUNK = SR * 2 * 0.2;
 const rounds = 2;
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 let round = 0;
 ws.on("open", () => {
     ws.send(JSON.stringify({ type: "hello", device_id: "multitest", token: "test" }));

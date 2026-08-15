@@ -24,9 +24,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../dist/gateway-bundle/**/*"
-    ]
+    "resources": {
+      "../dist/gateway-bundle": "gateway-bundle"
+    }
   },
   "plugins": {
     "shell": {

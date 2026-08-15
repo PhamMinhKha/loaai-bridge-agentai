@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 
-const ws = new WebSocket("ws://127.0.0.1:3000/ws");
+const ws = new WebSocket("ws://127.0.0.1:8888/ws");
 const SR = 16000;
 // 200ms of loud sine wave (exceeds VOICE_ENERGY) as Int16 PCM
 function sineChunk(freq = 440, ms = 200) {

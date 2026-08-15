@@ -30,7 +30,7 @@ function keyPathFromEnv() {
 }
 
 export function getServerInfo() {
-    const port = Number(process.env.PORT || config.port || 3000);
+    const port = Number(process.env.PORT || config.port || 8888);
     const host = process.env.HOST || config.host || "0.0.0.0";
     const tlsEnabled = tlsEnabledFromEnv();
     const certPath = certPathFromEnv();

@@ -5,6 +5,11 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 ## [Unreleased] — 2026-08-15
 
 ### Changed
+- Port mặc định HTTP/WS **3000 → 8888** (tránh trùng dev và port 6000 bị WebView2 chặn `ERR_UNSAFE_PORT`).
+- **Desktop MSI/Tauri**: ẩn cửa sổ console trên bản release; bundle `gateway-bundle` ổn định hơn;
+  truyền `PORT` rõ ràng khi spawn Node; log gateway tại `%LOCALAPPDATA%\Loa Ai Agent Bridge\gateway.log`;
+  reload WebView khi gateway sẵn sàng; click tray navigate lại URL.
+- `scripts/setup-dev.ps1`: chuỗi ASCII-only (tránh lỗi parse PowerShell 5.1 trên Windows).
 - Đổi tên hiển thị app thành **Loa Ai Agent Bridge** (title bar, tray, web UI, docs, cert TLS, log server, Telegram mirror).
 - **Web UI** tái cấu trúc đa tab: Giọng nói, Chat, Cấu hình, Thiết lập, ESP32, Thông tin, Cài đặt;
   header giao diện hiển thị **Loa Ai Agent Bridge** (phiên bản ở tab Thông tin).
@@ -63,6 +68,10 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `src/audio/wavUtil.js`, `src/agents/hermesRun.js`, `src/agents/openaiChat.js`).
 
 ### Fixed
+- **MSI cài xong không mở được UI**: Node crash với path `\\?\C:\Program Files\...` (EISDIR) —
+  strip prefix extended path trước khi spawn; tìm Node tại `Program Files\nodejs` nếu PATH thiếu.
+- **WebView ERR_UNSAFE_PORT** khi dùng port 6000 (Chromium chặn port X11) — chuyển mặc định sang 8888.
+- Hộp thoại lỗi + vẫn hiện tray/cửa sổ khi gateway khởi động chậm hoặc thất bại lần đầu.
 - Nút/link **Mở LoaAi.me**: chữ trắng trên nền xanh, mở URL qua Tauri shell thay vì bị chặn webview.
 - Chặn ảo giác Whisper kiểu outro YouTube (“Hãy subscribe cho kênh Ghiền Mì Gõ…”)
   — coi như chưa nói, không gửi STT/agent.

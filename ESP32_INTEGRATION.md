@@ -5,7 +5,7 @@ Gateway đã sẵn sàng nhận kết nối từ firmware ESP32 của bạn. Kh�
 ## Kết nối
 
 ```
-ws://<PC_IP>:3000/ws
+ws://<PC_IP>:8888/ws
 ```
 
 ## Protocol (ESP32 → Gateway)
@@ -58,5 +58,5 @@ Nếu firmware đã tự cắt VAD cục bộ, gửi audio_end để chốt ngay
 ```bash
 npm install
 node src/index.js
-# ESP32 connect ws://<pc_ip>:3000/ws
+# ESP32 connect ws://<pc_ip>:8888/ws
 ```

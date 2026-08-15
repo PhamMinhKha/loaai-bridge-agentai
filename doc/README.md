@@ -11,6 +11,6 @@ Gateway Node.js đứng giữa thiết bị thoại (ESP32 / trình duyệt) và
 
 Chạy: xem [SETUP.md](../SETUP.md) (script `npm run setup:dev`, `npm run dev`, `npm start`).
 
-- HTTP: `http://localhost:3000` (trang test `public/index.html`)
+- HTTP: `http://localhost:8888` (trang test `public/index.html`)
 - Health: `GET /health`
-- WebSocket: `ws://<host>:3000/ws`
+- WebSocket: `ws://<host>:8888/ws`
