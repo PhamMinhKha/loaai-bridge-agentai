@@ -18,18 +18,26 @@ function escapeHtml(s) {
         .replace(/>/g, "&gt;");
 }
 
-function formatTurn({ user, assistant, error, running }) {
-    const u = escapeHtml(clip(user, 1200));
-    const lines = [
-        "🎤 <b>Loa Ai Agent Bridge</b>",
-        "",
-        "🟠 <b>Bạn hỏi</b>",
-        `<blockquote>${u}</blockquote>`,
-        ""
-    ];
+/** Hermes: ESP32 luôn mirror. App web mirror mọi phase (API run không tự lên Telegram). */
+export function shouldMirrorToTelegram({ agent, phase, source }) {
+    void phase;
+    void agent;
+    void source;
+    return true;
+}
+
+function formatTurn({ user, assistant, error, running, source }) {
+    const title = source === "web"
+        ? "💬 <b>App → Loa Ai Agent Bridge</b>"
+        : "🎤 <b>ESP32 → Loa Ai Agent Bridge</b>";
+    const lines = [title, ""];
+    if (source === "esp32" && user) {
+        const u = escapeHtml(clip(user, 1200));
+        lines.push("🟠 <b>Bạn hỏi</b>", `<blockquote>${u}</blockquote>`, "");
+    }
     if (running) {
         lines.push("⏳ <b>Đang chạy nền</b> (có thể 9–30 phút)");
-        lines.push("Kết quả sẽ gửi vào chat này khi xong. Bạn cứ hỏi tiếp được.");
+        lines.push("Kết quả Hermes sẽ gửi vào chat này khi xong.");
     } else if (error) {
         const err = escapeHtml(clip(error, 800));
         lines.push("🔴 <b>Lỗi — đã dừng</b>");
@@ -46,12 +54,35 @@ function formatTurn({ user, assistant, error, running }) {
     return lines.join("\n");
 }
 
-export function mirrorChatToTelegram({ user, assistant, error, running }) {
+/**
+ * @param {"esp32"|"web"} source — nguồn hội thoại (không mirror chat Telegram gốc)
+ * @param {"immediate"|"deferred-start"|"deferred-done"|"error"} phase
+ */
+export function mirrorChatToTelegram({
+    user,
+    assistant,
+    error,
+    running,
+    source = "esp32",
+    agent,
+    phase
+}) {
     const prefs = getTelegramPrefs();
     if (!prefs.sync) return Promise.resolve(false);
-    const body = formatTurn({ user, assistant, error, running });
-    const bin = findHermesBin();
+
     const target = prefs.to || "telegram";
+    if (!target || target === "telegram") {
+        console.warn("[telegram] TELEGRAM_TO chưa cấu hình — cần telegram:<chat_id> (vd telegram:7412625920)");
+        return Promise.resolve(false);
+    }
+
+    const resolvedPhase = phase || (running ? "deferred-start" : error ? "error" : "immediate");
+    if (!shouldMirrorToTelegram({ agent, phase: resolvedPhase, source })) {
+        return Promise.resolve(false);
+    }
+
+    const body = formatTurn({ user, assistant, error, running, source });
+    const bin = findHermesBin();
     const tmp = path.join(os.tmpdir(), `vg-tg-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
     try {
         fs.writeFileSync(tmp, body, "utf8");
@@ -73,7 +104,7 @@ export function mirrorChatToTelegram({ user, assistant, error, running }) {
         }, 20000);
         const done = (ok) => {
             clearTimeout(t);
-            try { fs.unlinkSync(tmp); } catch {}
+            try { fs.unlinkSync(tmp); } catch { /* ignore */ }
             resolve(ok);
         };
         child.on("error", (e) => {
@@ -81,8 +112,12 @@ export function mirrorChatToTelegram({ user, assistant, error, running }) {
             done(false);
         });
         child.on("close", (code) => {
-            if (code !== 0) console.warn("[telegram]", (err || `exit ${code}`).trim().slice(0, 240));
-            else console.log("[telegram] synced");
+            if (code !== 0) {
+                console.warn("[telegram]", (err || `exit ${code}`).trim().slice(0, 400));
+                console.warn("[telegram] target=", target, "— kiểm tra TELEGRAM_TO=telegram:<chat_id>");
+            } else {
+                console.log("[telegram] synced", source, resolvedPhase, "→", target);
+            }
             done(code === 0);
         });
     });

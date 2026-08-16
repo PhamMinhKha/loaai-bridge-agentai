@@ -1,7 +1,6 @@
-import { OpusDecodeStream, OpusEncodeStream, OPUS_FRAME_MS } from "../audio/opusCodec.js";
+import { OpusDecodeStream, OPUS_FRAME_MS } from "../audio/opusCodec.js";
 import { getOrCreateSession, setState } from "../sessions/sessionManager.js";
-import { mergePrefs, resolveAgent, resolveTts } from "../runtime/options.js";
-import { playTtsXiaozhi } from "../audio/ttsPlayback.js";
+import { mergePrefs, resolveAgent } from "../runtime/options.js";
 import { mirrorChatToTelegram } from "../runtime/telegramSync.js";
 import { sendJson } from "../runtime/log.js";
 import { saveSttDump } from "../runtime/sttDump.js";
@@ -41,9 +40,18 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
     let prefs = { ...initialPrefs };
     let pendingConvId = null;
     const opusDec = new OpusDecodeStream();
-    const opusEnc = new OpusEncodeStream();
 
     const send = (o) => sendJson(socket, o, "xiaozhi");
+    /** ESP32 firmware chờ {tts:stop} sau llm — không TTS thì gửi stop ngay để thoát speaking. */
+    const finishEsp32Reply = () => {
+        send({ type: "tts", state: "stop" });
+        send({ type: "state", state: "listening" });
+        armListen();
+    };
+    const deliverLlm = (text, emotion = "neutral") => {
+        send({ type: "llm", text, emotion });
+        finishEsp32Reply();
+    };
     const clearSilence = () => { if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; } };
     const clearListen = () => { if (listenTimer) { clearTimeout(listenTimer); listenTimer = null; } };
     const armSilence = () => { clearSilence(); silenceTimer = setTimeout(() => finalizeAudio(), SILENCE_MS); };
@@ -131,57 +139,60 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
         if (isScreenshotCommand(text)) {
             try {
                 await sendScreenshot(send, {});
-                send({ type: "llm", text: "Đã chụp màn hình máy tính.", emotion: "happy" });
+                deliverLlm("Đã chụp màn hình máy tính.", "happy");
             } catch (e) {
                 send({ type: "error", code: "SCREENSHOT_ERROR", message: e.message });
+                finishEsp32Reply();
             }
-            send({ type: "state", state: "listening" });
-            armListen();
             return;
         }
         send({ type: "state", state: "thinking" });
         const agent = resolveAgent(prefs);
-        const tts = resolveTts(prefs);
+        const agentProvider = prefs.agent;
+
         const later = async ({ text: reply, error }) => {
             if (error) {
                 send({ type: "error", code: "AGENT_ERROR", message: error });
-                mirrorChatToTelegram({ user: text, error });
+                mirrorChatToTelegram({
+                    user: text, error, source: "esp32", agent: agentProvider, phase: "error"
+                });
                 attachConversationReply(pendingConvId, "", error);
                 pendingConvId = null;
+                finishEsp32Reply();
                 return;
             }
-            send({ type: "llm", text: reply, emotion: "neutral" });
-            mirrorChatToTelegram({ user: text, assistant: reply });
+            deliverLlm(reply, "neutral");
+            mirrorChatToTelegram({
+                user: text, assistant: reply, source: "esp32", agent: agentProvider, phase: "deferred-done"
+            });
             attachConversationReply(pendingConvId, reply);
             pendingConvId = null;
-            try {
-                await playTtsXiaozhi(socket, tts, reply, { codec, opusEnc });
-            } catch (e) { console.error("[xiaozhi-tts]", e.message); }
         };
         try {
             const result = await agent.sendMessage({ sessionId: session.sessionId, text, onLater: later });
             const reply = result.text || "";
-            send({ type: "state", state: "speaking" });
-            send({ type: "llm", text: reply, emotion: "neutral" });
+            deliverLlm(reply, "neutral");
             if (result.deferred) {
-                mirrorChatToTelegram({ user: text, running: true });
+                mirrorChatToTelegram({
+                    user: text, running: true, source: "esp32", agent: agentProvider, phase: "deferred-start"
+                });
             } else {
-                mirrorChatToTelegram({ user: text, assistant: reply });
+                mirrorChatToTelegram({
+                    user: text, assistant: reply, source: "esp32", agent: agentProvider, phase: "immediate"
+                });
                 attachConversationReply(pendingConvId, reply);
                 pendingConvId = null;
             }
-            try {
-                await playTtsXiaozhi(socket, tts, reply, { codec, opusEnc });
-            } catch (e) { console.error("[xiaozhi-tts]", e.message); }
         } catch (e) {
             console.error("[xiaozhi-agent]", e.message);
             send({ type: "error", code: "AGENT_ERROR", message: e.message });
-            mirrorChatToTelegram({ user: text, error: e.message });
+            mirrorChatToTelegram({
+                user: text, error: e.message, source: "esp32", agent: agentProvider, phase: "error"
+            });
             attachConversationReply(pendingConvId, "", e.message);
             pendingConvId = null;
+            finishEsp32Reply();
         }
-        send({ type: "state", state: "listening" });
-        armListen();
     };
 
     deviceId = extra.deviceId || "xiaozhi-" + Math.random().toString(36).slice(2, 8);

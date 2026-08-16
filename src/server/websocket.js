@@ -172,16 +172,21 @@ export function createWebSocketServer(server, opts = {}) {
             send(msg.state("thinking"));
             const agent = resolveAgent(prefs);
             const tts = resolveTts(prefs);
+            const agentProvider = prefs.agent;
             const later = async ({ text: reply, error }) => {
                 if (error) {
                     send(msg.error("AGENT_ERROR", error));
-                    mirrorChatToTelegram({ user: text, error });
+                    mirrorChatToTelegram({
+                        user: text, error, source: "web", agent: agentProvider, phase: "error"
+                    });
                     attachConversationReply(pendingConvId, "", error);
                     pendingConvId = null;
                     return;
                 }
                 send(msg.agentMessage(reply, session.sessionId));
-                mirrorChatToTelegram({ user: text, assistant: reply });
+                mirrorChatToTelegram({
+                    user: text, assistant: reply, source: "web", agent: agentProvider, phase: "deferred-done"
+                });
                 attachConversationReply(pendingConvId, reply);
                 pendingConvId = null;
                 try { await playTtsNative(socket, tts, reply); }
@@ -193,9 +198,13 @@ export function createWebSocketServer(server, opts = {}) {
                 send(msg.state("speaking"));
                 send(msg.agentMessage(reply, session.sessionId));
                 if (result.deferred) {
-                    mirrorChatToTelegram({ user: text, running: true });
+                    mirrorChatToTelegram({
+                        user: text, running: true, source: "web", agent: agentProvider, phase: "deferred-start"
+                    });
                 } else {
-                    mirrorChatToTelegram({ user: text, assistant: reply });
+                    mirrorChatToTelegram({
+                        user: text, assistant: reply, source: "web", agent: agentProvider, phase: "immediate"
+                    });
                     attachConversationReply(pendingConvId, reply);
                     pendingConvId = null;
                 }
@@ -204,7 +213,9 @@ export function createWebSocketServer(server, opts = {}) {
                 } catch (e) { console.error("[tts]", e.message); }
             } catch (e) {
                 send(msg.error("AGENT_ERROR", e.message));
-                mirrorChatToTelegram({ user: text, error: e.message });
+                mirrorChatToTelegram({
+                    user: text, error: e.message, source: "web", agent: agentProvider, phase: "error"
+                });
                 attachConversationReply(pendingConvId, "", e.message);
                 pendingConvId = null;
             }

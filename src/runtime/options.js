@@ -2,7 +2,9 @@ import { config } from "../config/config.js";
 import { createAgent } from "../agents/factory.js";
 import { createTts, normalizeTtsProvider, normalizeSttProvider } from "../audio/audioManager.js";
 import { probeOpenAi, probeOpenAiAuth } from "../agents/openaiChat.js";
-import { upsertEnvFile, VG_ENV } from "./envFile.js";
+import { upsertEnvFile, VG_ENV, VG_ROOT } from "./envFile.js";
+import fs from "node:fs";
+import path from "node:path";
 import { reconfigureStt, getSttPrefs as runtimeSttPrefs } from "./sttRuntime.js";
 import { readHermesApiKey } from "./hermesEnv.js";
 
@@ -38,6 +40,20 @@ function normalizeAgent(name) {
     return "mock";
 }
 
+function normalizeTelegramTo(raw) {
+    const s = String(raw || "").trim();
+    if (s && s !== "telegram") return s;
+    const bundleEnv = path.join(VG_ROOT, ".env");
+    try {
+        if (fs.existsSync(bundleEnv)) {
+            const m = fs.readFileSync(bundleEnv, "utf8").match(/^TELEGRAM_TO=(.*)$/m);
+            const b = m?.[1]?.trim();
+            if (b && b !== "telegram") return b;
+        }
+    } catch { /* ignore */ }
+    return s || "telegram";
+}
+
 const state = {
     agentProvider: normalizeAgent(config.agentProvider),
     ttsProvider: normalizeTtsProvider(config.tts.provider),
@@ -48,8 +64,13 @@ const state = {
     openclaw: { ...config.openclaw },
     hermes: { ...config.hermes },
     telegramSync: String(process.env.TELEGRAM_SYNC || "true").toLowerCase() !== "false",
-    telegramTo: process.env.TELEGRAM_TO || "telegram"
+    telegramTo: normalizeTelegramTo(process.env.TELEGRAM_TO)
 };
+
+if (process.env.TELEGRAM_TO === "telegram" && state.telegramTo !== "telegram") {
+    upsertEnvFile(VG_ENV, { TELEGRAM_TO: state.telegramTo });
+    process.env.TELEGRAM_TO = state.telegramTo;
+}
 
 const agentCache = new Map();
 const ttsCache = new Map();
@@ -153,8 +174,16 @@ export function applyGlobalOptions(patch = {}) {
 
     if (state.agentProvider === "hermes") ensureHermesToken();
 
-    if (typeof patch.telegramSync === "boolean") state.telegramSync = patch.telegramSync;
-    if (patch.telegramTo) state.telegramTo = String(patch.telegramTo);
+    if (typeof patch.telegramSync === "boolean") {
+        state.telegramSync = patch.telegramSync;
+        upsertEnvFile(VG_ENV, { TELEGRAM_SYNC: state.telegramSync ? "true" : "false" });
+        process.env.TELEGRAM_SYNC = state.telegramSync ? "true" : "false";
+    }
+    if (patch.telegramTo) {
+        state.telegramTo = String(patch.telegramTo);
+        upsertEnvFile(VG_ENV, { TELEGRAM_TO: state.telegramTo });
+        process.env.TELEGRAM_TO = state.telegramTo;
+    }
 
     const sttChanged = state.sttProvider !== prev.sttProvider ||
         state.whisperModel !== prev.whisperModel ||
@@ -264,7 +293,10 @@ export async function publicOptions() {
         },
         stt: STT_PROVIDERS,
         whisperModels: WHISPER_MODELS,
-        telegram: getTelegramPrefs()
+        telegram: {
+            ...getTelegramPrefs(),
+            to: state.telegramTo
+        }
     };
 }
 

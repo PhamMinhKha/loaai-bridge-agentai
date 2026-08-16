@@ -387,6 +387,12 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Allow the desktop UI to read and change autostart",
+          "type": "string",
+          "const": "allow-desktop-autostart",
+          "markdownDescription": "Allow the desktop UI to read and change autostart"
+        },
+        {
           "description": "Allow opening external URLs from the UI",
           "type": "string",
           "const": "allow-open-external-url",

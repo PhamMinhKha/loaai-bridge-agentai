@@ -648,8 +648,12 @@
         <div class="full">
           <label class="check-row">
             <input type="checkbox" id="chkTelegram" checked />
-            Đồng bộ hội thoại lên Telegram (Hermes)
+            Đồng bộ hội thoại app + ESP32 lên Telegram (Hermes)
           </label>
+        </div>
+        <div class="full" id="telegramToWrap">
+          <label for="inpTelegramTo">Telegram chat ID (<code>telegram:123456789</code>)</label>
+          <input type="text" id="inpTelegramTo" placeholder="telegram:7412625920" autocomplete="off" spellcheck="false" />
         </div>
         <div class="full btn-row">
           <button class="btn-primary" id="applyCfg">Áp dụng cấu hình</button>
@@ -686,7 +690,7 @@
   <section class="panel guide" id="panelEsp" role="tabpanel">
     <div class="card">
       <h2 class="card-title">Cấu hình ESP32-S3</h2>
-      <p class="card-desc">Firmware xiaozhi-esp32 kết nối Loa Ai Agent Bridge qua WebSocket.</p>
+      <p class="card-desc">Firmware xiaozhi-esp32 kết nối Loa Ai Agent Bridge qua WebSocket. ESP32 chỉ nhận <b>text</b> (<code>llm</code>); TTS chỉ phát trên tab Giọng nói / Chat của app.</p>
 
       <h2>1. Địa chỉ WebSocket</h2>
       <p class="card-desc" id="espWsHint" style="margin-top:0;margin-bottom:.5rem"></p>
@@ -727,8 +731,8 @@
         <tr><th>Message</th><th>Ý nghĩa</th></tr>
         <tr><td><code>state: listening</code></td><td>Đang nghe</td></tr>
         <tr><td><code>stt / transcript</code></td><td>Kết quả STT</td></tr>
-        <tr><td><code>llm / agent_message</code></td><td>Trả lời Agent</td></tr>
-        <tr><td><code>audio_start + WAV</code></td><td>TTS audio</td></tr>
+        <tr><td><code>llm / agent_message</code></td><td>Trả lời Agent (text trên màn hình — không TTS audio)</td></tr>
+        <tr><td><code>{"type":"tts","state":"stop"}</code></td><td>Kết thúc speaking ngay (không có TTS audio)</td></tr>
       </table>
 
       <h2>5. .env mẫu</h2>
@@ -1034,6 +1038,17 @@ if (APP_MODE) {
   initDesktopSettings();
 }
 
+function tauriErrorMessage(err) {
+  if (err == null) return "lỗi không xác định";
+  if (typeof err === "string") return err;
+  if (typeof err.message === "string" && err.message) return err.message;
+  try {
+    const json = JSON.stringify(err);
+    if (json && json !== "{}") return json;
+  } catch {}
+  return String(err);
+}
+
 async function tauriInvoke(cmd, args = {}) {
   const invoke = window.__TAURI__?.core?.invoke;
   if (!invoke) {
@@ -1082,7 +1097,7 @@ async function initDesktopSettings() {
     hintEl.textContent = autostartHintFor(platform, !!enabled);
   } catch (err) {
     console.warn("desktop settings:", err);
-    hintEl.textContent = "Không đọc được trạng thái autostart: " + err.message;
+    hintEl.textContent = "Không đọc được trạng thái autostart: " + tauriErrorMessage(err);
   }
 
   chk.addEventListener("change", async () => {
@@ -1094,7 +1109,7 @@ async function initDesktopSettings() {
       hintEl.textContent = autostartHintFor(platform, !!enabled);
     } catch (err) {
       chk.checked = !want;
-      hintEl.textContent = "Không đổi được autostart: " + err.message;
+      hintEl.textContent = "Không đổi được autostart: " + tauriErrorMessage(err);
     } finally {
       chk.disabled = false;
     }
@@ -2002,7 +2017,8 @@ function currentPrefs() {
     voice: document.getElementById("selVoice").value,
     stt: document.getElementById("selStt").value,
     whisperModel: document.getElementById("selWhisperModel").value,
-    telegramSync: document.getElementById("chkTelegram").checked
+    telegramSync: document.getElementById("chkTelegram").checked,
+    telegramTo: document.getElementById("inpTelegramTo").value.trim()
   };
   const key = document.getElementById("inpSttApiKey").value.trim();
   if (key) body.sttApiKey = key;
@@ -2183,7 +2199,11 @@ function applyServerOptions(opts) {
   if (opts.current.voice) document.getElementById("selVoice").value = opts.current.voice;
   if (opts.current.sttApiKeySet) document.getElementById("inpSttApiKey").placeholder = "•••••••• (đã lưu)";
   updateCfgSummary();
-  if (opts.telegram) document.getElementById("chkTelegram").checked = !!opts.telegram.sync;
+  if (opts.telegram) {
+    document.getElementById("chkTelegram").checked = !!opts.telegram.sync;
+    const toEl = document.getElementById("inpTelegramTo");
+    if (toEl && opts.telegram.to) toEl.value = opts.telegram.to;
+  }
   updateReach();
   updateBridgeFlow(opts.current?.agent);
 }

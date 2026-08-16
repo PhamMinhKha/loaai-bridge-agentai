@@ -1,0 +1,8 @@
+[[permission]]
+identifier = "allow-desktop-autostart"
+description = "Allow the desktop UI to read and change autostart"
+commands.allow = [
+  "desktop_platform",
+  "get_autostart_enabled",
+  "set_autostart_enabled"
+]

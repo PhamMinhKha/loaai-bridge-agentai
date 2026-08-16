@@ -41,6 +41,22 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - **ESP32 Opus lỗi auth lặt vặt / vẫn trả lời trễ**: sau hello Opus, handler WebSocket cũ vẫn chạy song song
   với xiaozhi → ném `Device not authenticated`. Giờ tắt handler cũ khi chuyển sang xiaozhi.
 
+## [Unreleased] — 2026-08-16 (ESP32 text-only, Telegram sync)
+
+### Changed
+- **ESP32-S3 không TTS**: chỉ gửi text qua `llm`; TTS giữ trên tab Giọng nói / Chat app.
+- **Telegram mirror** (`telegramSync.js`): phân biệt nguồn app vs ESP32; ghi `TELEGRAM_SYNC` / `TELEGRAM_TO`
+  vào `.env`; UI thêm ô **Telegram chat ID** (`telegram:123456789`).
+- Tauri: quyền `allow-desktop-autostart` cho toggle autostart trên UI desktop.
+
+### Fixed
+- **ESP32 kẹt `speaking`**: firmware chờ `{tts:stop}` sau `llm` — gửi `stop` ngay (không audio Opus)
+  rồi `listening`.
+- **Telegram không nhận tin**: `TELEGRAM_TO=telegram` (placeholder) làm `hermes send` fail — cần
+  `telegram:<chat_id>`; tự fallback từ repo `.env` khi user file thiếu ID.
+- **App Chat không sync Telegram** sau khi sửa trùng tin — khôi phục mirror web; ESP32 + job nền
+  Hermes luôn mirror qua gateway.
+
 ## [Unreleased] — 2026-08-16
 
 ### Changed
