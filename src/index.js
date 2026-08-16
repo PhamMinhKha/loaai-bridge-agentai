@@ -46,6 +46,18 @@ function requireLoopback(req, res) {
     return true;
 }
 
+/** WKWebView (Tauri) times out if no response headers for ~60s during long setup. */
+function beginLongJsonResponse(res) {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    if (typeof res.flushHeaders === "function") res.flushHeaders();
+}
+
+function endLongJsonResponse(res, statusCode, payload) {
+    if (!res.headersSent) res.status(statusCode);
+    res.end(JSON.stringify(payload));
+}
+
 app.get("/health", async (req, res) => {
     try {
         const opts = await publicOptions();
@@ -99,12 +111,13 @@ app.post("/api/setup/hermes", async (req, res) => {
     if (!isLoopback(req)) {
         return res.status(403).json({ error: "Chỉ chạy setup Hermes từ máy local (127.0.0.1)" });
     }
+    beginLongJsonResponse(res);
     try {
         const result = await setupHermesForVoiceGateway();
         broadcastConfig(getPrefs());
-        res.json(result);
+        endLongJsonResponse(res, 200, result);
     } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
+        endLongJsonResponse(res, 500, { ok: false, error: e.message });
     }
 });
 
@@ -112,10 +125,13 @@ app.post("/api/setup/openclaw", async (req, res) => {
     if (!isLoopback(req)) {
         return res.status(403).json({ error: "Chỉ chạy setup OpenClaw từ máy local (127.0.0.1)" });
     }
+    beginLongJsonResponse(res);
     try {
-        res.json(await setupOpenClawForVoiceGateway());
+        const result = await setupOpenClawForVoiceGateway();
+        broadcastConfig(getPrefs());
+        endLongJsonResponse(res, 200, result);
     } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
+        endLongJsonResponse(res, 500, { ok: false, error: e.message });
     }
 });
 
@@ -123,10 +139,11 @@ app.post("/api/setup/dev", async (req, res) => {
     if (!isLoopback(req)) {
         return res.status(403).json({ error: "Chỉ chạy setup từ máy local (127.0.0.1)" });
     }
+    beginLongJsonResponse(res);
     try {
-        res.json(await runDevSetup());
+        endLongJsonResponse(res, 200, await runDevSetup());
     } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
+        endLongJsonResponse(res, 500, { ok: false, error: e.message });
     }
 });
 

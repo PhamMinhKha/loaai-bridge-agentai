@@ -98,6 +98,7 @@ impl GatewayProcess {
         if let Some(user_env) = user_env_path() {
             cmd.env("VG_USER_ENV", user_env.to_string_lossy().as_ref());
         }
+        cmd.env("PATH", gui_path_env());
         hide_console(&mut cmd);
 
         let child = cmd.spawn().map_err(|e| {
@@ -502,6 +503,46 @@ fn hide_console(cmd: &mut Command) {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
     let _ = cmd;
+}
+
+/// macOS GUI apps get a minimal PATH; extend so Node can spawn openclaw/python/homebrew tools.
+fn gui_path_env() -> String {
+    let mut paths: Vec<String> = Vec::new();
+    if let Ok(existing) = std::env::var("PATH") {
+        if !existing.is_empty() {
+            paths.push(existing);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        paths.push("/opt/homebrew/bin".into());
+        paths.push("/usr/local/bin".into());
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(format!("{home}/.local/bin"));
+            let nvm_root = format!("{home}/.nvm/versions/node");
+            if let Ok(entries) = fs::read_dir(&nvm_root) {
+                let mut vers: Vec<PathBuf> = entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path().join("bin"))
+                    .filter(|p| p.is_dir())
+                    .collect();
+                vers.sort();
+                for p in vers {
+                    paths.push(p.to_string_lossy().into_owned());
+                }
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        paths.push("/usr/local/bin".into());
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(format!("{home}/.local/bin"));
+        }
+    }
+    paths.push("/usr/bin".into());
+    paths.push("/bin".into());
+    paths.join(":")
 }
 
 fn kill_processes_on_port(port: u16) -> Result<(), String> {

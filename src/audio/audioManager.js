@@ -128,6 +128,11 @@ export class StreamingSTT {
         delete cleanEnv.PYTHONHOME;
         this.proc = spawn(this.python, [script, this.model], { windowsHide: true, env: cleanEnv });
         this.proc.stderr.on("data", (d) => process.stderr.write(d));
+        this.proc.on("error", (err) => {
+            console.error("[stt] spawn error:", err.message);
+            while (this._queue.length) { const q = this._queue.shift(); clearTimeout(q.timer); q.resolve(null); }
+            this.proc = null;
+        });
         this.proc.on("exit", () => {
             // worker died: fail pending requests so callers don't hang forever
             while (this._queue.length) { const q = this._queue.shift(); clearTimeout(q.timer); q.resolve(null); }

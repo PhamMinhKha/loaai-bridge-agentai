@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { probeOpenAi } from "../agents/openaiChat.js";
+import { findOpenClawBin } from "./binPaths.js";
 import { applyGlobalOptions, publicOptions } from "./options.js";
 import { upsertEnvFile, getVgEnvPath } from "./envFile.js";
 
@@ -22,16 +23,6 @@ function openclawHome() {
 export function openclawConfigPath() {
     if (process.env.OPENCLAW_CONFIG_PATH) return process.env.OPENCLAW_CONFIG_PATH;
     return path.join(openclawHome(), "openclaw.json");
-}
-
-export function findOpenClawBin() {
-    const candidates = [
-        process.env.OPENCLAW_BIN,
-        "/opt/homebrew/bin/openclaw",
-        "/usr/local/bin/openclaw",
-        path.join(os.homedir(), ".local", "bin", "openclaw")
-    ].filter(Boolean);
-    return candidates.find((p) => fs.existsSync(p)) || "openclaw";
 }
 
 function run(cmd, args, timeoutMs = 45000) {

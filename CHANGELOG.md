@@ -28,6 +28,14 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   `HOST=127.0.0.1` khi dùng Cloudflare Tunnel.
 
 ### Fixed
+- **OpenClaw setup «Load failed»** (app Tauri): gateway crash do `spawn python ENOENT` khi STT Whisper
+  chạy với PATH hạn chế của GUI macOS — thêm handler lỗi spawn, không làm sập process.
+- **Setup OpenClaw/Hermes timeout** trong WKWebView: API setup gửi HTTP headers sớm; UI dùng
+  `fetchJsonLong` (6 phút); thông báo lỗi rõ khi gateway không phản hồi (gợi ý xem
+  `~/Loa Ai Agent Bridge/gateway.log`).
+- **Tìm python/openclaw** khi app desktop spawn gateway: `.venv`, Homebrew, nvm (`binPaths.js`);
+  Tauri mở rộng `PATH` (Homebrew, nvm, `~/.local/bin`) cho Node child process.
+- OpenClaw setup xong **broadcast config** tới WebSocket/ESP32 (trước chỉ Hermes).
 - MSI không lưu được `AGENT_PROVIDER` / `HERMES_TOKEN` vì `.env` trong Program Files read-only.
 - Autostart Windows không chạy (path có space, plugin ghi sai, hoặc bị StartupApproved tắt).
 - Hermes 401 sau Setup — token cũ trong memory; lỗi 401 giờ chỉ rõ token không khớp `API_SERVER_KEY`.

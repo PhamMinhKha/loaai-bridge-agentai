@@ -1,4 +1,5 @@
 import { loadVgEnv } from "../runtime/envFile.js";
+import { resolvePythonPath } from "../runtime/binPaths.js";
 
 loadVgEnv();
 
@@ -42,14 +43,14 @@ export const config = {
         provider: process.env.STT_PROVIDER || "none",
         apiKey: process.env.STT_API_KEY,
         model: process.env.WHISPER_MODEL || "medium",
-        python: process.env.WHISPER_PYTHON || "python"
+        python: resolvePythonPath(process.env.WHISPER_PYTHON)
     },
 
     tts: {
         provider: process.env.TTS_PROVIDER || "edge",
         apiKey: process.env.TTS_API_KEY,
         voice: process.env.TTS_VOICE || "vi-VN-HoaiMyNeural",
-        python: process.env.TTS_PYTHON || "python",
+        python: resolvePythonPath(process.env.TTS_PYTHON),
         rate: Number(process.env.TTS_RATE || 160)
     }
 };
