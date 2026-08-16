@@ -250,8 +250,8 @@ export function handleXiaozhi(socket, initialFormat, initialPrefs, extra = {}) {
                     deviceId = message.device_id;
                     session = getOrCreateSession(deviceId);
                 }
-                if (message.agent || message.tts || message.voice) {
-                    prefs = mergePrefs(prefs, message);
+                if (message.tts || message.voice) {
+                    prefs = mergePrefs(prefs, { tts: message.tts, voice: message.voice });
                     send({ type: "config_ok", ...prefs });
                 }
             } else if (message.type === "config") {

@@ -246,8 +246,9 @@ export function createWebSocketServer(server, opts = {}) {
                             return;
                         }
                         authed = true;
-                        if (message.agent || message.tts || message.voice) {
-                            prefs = mergePrefs(prefs, message);
+                        prefs = { ...getPrefs() };
+                        if (message.tts || message.voice) {
+                            prefs = mergePrefs(prefs, { tts: message.tts, voice: message.voice });
                         }
                         if (message.audio_params && (message.audio_params.format === "opus" || message.audio_params.format === "pcm")) {
                             const fmt = message.audio_params.format;

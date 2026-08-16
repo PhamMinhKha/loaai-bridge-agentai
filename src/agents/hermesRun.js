@@ -21,6 +21,9 @@ export async function startHermesRun({ baseUrl, token, input, sessionId, history
     let data = {};
     try { data = JSON.parse(raw); } catch { /* ignore */ }
     if (!res.ok && res.status !== 202) {
+        if (res.status === 401) {
+            throw new Error(`Hermes runs HTTP 401 — HERMES_TOKEN không khớp API_SERVER_KEY. ${raw.slice(0, 120)}`);
+        }
         throw new Error(`Hermes runs HTTP ${res.status} ${raw.slice(0, 200)}`);
     }
     const runId = data.run_id;

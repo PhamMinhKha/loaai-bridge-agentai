@@ -29,6 +29,12 @@ export async function openaiChatCompletions({
         });
         const raw = await response.text();
         if (!response.ok) {
+            if (response.status === 401) {
+                throw new Error(
+                    `HTTP 401 — HERMES_TOKEN không khớp API_SERVER_KEY trong Hermes. ` +
+                    `Bấm «Setup Hermes API» hoặc đặt HERMES_TOKEN trong .env. ${raw.slice(0, 120)}`
+                );
+            }
             throw new Error(`HTTP ${response.status} ${raw.slice(0, 240)}`);
         }
         let data;
@@ -52,6 +58,24 @@ export async function openaiChatCompletions({
             throw new Error(`Agent timeout (${Math.round(timeoutMs / 1000)}s)`);
         }
         throw e;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export async function probeOpenAiAuth(baseUrl, token, timeoutMs = 1200) {
+    if (!baseUrl) return false;
+    const url = `${String(baseUrl).replace(/\/$/, "")}/v1/models`;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            signal: ac.signal
+        });
+        return res.ok;
+    } catch {
+        return false;
     } finally {
         clearTimeout(timer);
     }

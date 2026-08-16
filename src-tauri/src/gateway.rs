@@ -95,6 +95,9 @@ impl GatewayProcess {
             .env("PORT", self.port.to_string())
             .stdout(Stdio::from(log_out))
             .stderr(Stdio::from(log_err));
+        if let Some(user_env) = user_env_path() {
+            cmd.env("VG_USER_ENV", user_env.to_string_lossy().as_ref());
+        }
         hide_console(&mut cmd);
 
         let child = cmd.spawn().map_err(|e| {
@@ -324,6 +327,10 @@ pub fn gateway_log_path() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));
     base.join("Loa Ai Agent Bridge").join("gateway.log")
+}
+
+pub fn user_env_path() -> Option<PathBuf> {
+    gateway_log_path().parent().map(|p| p.join(".env"))
 }
 
 pub fn show_error_dialog(title: &str, msg: &str) {

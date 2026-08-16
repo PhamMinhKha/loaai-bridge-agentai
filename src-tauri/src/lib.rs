@@ -25,8 +25,15 @@ pub fn run() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(8888);
 
+    let from_autostart = autostart::launched_from_autostart();
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args(["--autostart"])
+                .app_name("Loa Ai Agent Bridge")
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             open_external_url,
@@ -36,25 +43,36 @@ pub fn run() {
         ])
         .setup({
             move |app| {
+                autostart::heal_if_enabled(app.handle());
+
                 let resource = app.path().resource_dir().ok();
                 let root = bundled_root(resource);
                 let gateway = Arc::new(GatewayProcess::new(root, port));
                 app.manage(gateway.clone());
 
-                tray::create_main_window(app.handle(), &gateway::loading_page_url())?;
+                tray::create_main_window(
+                    app.handle(),
+                    &gateway::loading_page_url(),
+                    !from_autostart,
+                )?;
 
                 match gateway.ensure_running() {
                     Ok(()) => {
-                        tray::navigate_main_window(app.handle(), &gateway.app_url());
+                        tray::load_main_window(app.handle(), &gateway.app_url(), !from_autostart);
                     }
                     Err(e) => {
                         eprintln!("[gateway] {e}");
                         gateway::show_error_dialog("Loa Ai Agent Bridge", &e);
-                        tray::navigate_main_window(
+                        tray::load_main_window(
                             app.handle(),
                             &gateway::error_page_url(&e),
+                            true,
                         );
-                        schedule_webview_reload(app.handle().clone(), gateway.clone());
+                        schedule_webview_reload(
+                            app.handle().clone(),
+                            gateway.clone(),
+                            from_autostart,
+                        );
                     }
                 }
                 tray::setup_tray(app.handle(), gateway)?;
@@ -72,14 +90,18 @@ pub fn run() {
         });
 }
 
-fn schedule_webview_reload(app: tauri::AppHandle, gateway: SharedGateway) {
+fn schedule_webview_reload(
+    app: tauri::AppHandle,
+    gateway: SharedGateway,
+    from_autostart: bool,
+) {
     thread::spawn(move || {
         for _ in 0..90 {
             if gateway.wait_healthy(1) {
                 let url = gateway.app_url();
                 let app_handle = app.clone();
                 let _ = app.run_on_main_thread(move || {
-                    tray::navigate_main_window(&app_handle, &url);
+                    tray::load_main_window(&app_handle, &url, !from_autostart);
                 });
                 break;
             }

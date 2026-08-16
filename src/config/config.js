@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { loadVgEnv } from "../runtime/envFile.js";
+
+loadVgEnv();
 
 export const config = {
     port: Number(process.env.PORT || 8888),

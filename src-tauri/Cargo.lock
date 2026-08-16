@@ -4297,6 +4297,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-autostart",
  "tauri-plugin-shell",
+ "winreg 0.55.0",
 ]
 
 [[package]]

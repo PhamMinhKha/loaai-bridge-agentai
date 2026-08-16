@@ -1,9 +1,10 @@
 import { config } from "../config/config.js";
 import { createAgent } from "../agents/factory.js";
 import { createTts, normalizeTtsProvider, normalizeSttProvider } from "../audio/audioManager.js";
-import { probeOpenAi } from "../agents/openaiChat.js";
+import { probeOpenAi, probeOpenAiAuth } from "../agents/openaiChat.js";
 import { upsertEnvFile, VG_ENV } from "./envFile.js";
 import { reconfigureStt, getSttPrefs as runtimeSttPrefs } from "./sttRuntime.js";
+import { readHermesApiKey } from "./hermesEnv.js";
 
 export const EDGE_VOICES = [
     { id: "vi-VN-HoaiMyNeural", label: "Tiếng Việt — Hoài My (nữ)" },
@@ -81,6 +82,44 @@ export function mergePrefs(base, patch = {}) {
     return next;
 }
 
+function syncHermesToken() {
+    if (state.agentProvider !== "hermes") return false;
+    const key = readHermesApiKey();
+    if (!key) return false;
+    if (state.hermes.token === key) return false;
+    state.hermes.token = key;
+    return true;
+}
+
+function ensureHermesToken() {
+    if (state.agentProvider !== "hermes") return;
+    if (syncHermesToken()) {
+        persistHermesEnv();
+        agentCache.clear();
+    }
+}
+
+function persistHermesEnv() {
+    const entries = {};
+    if (state.hermes.url) entries.HERMES_URL = state.hermes.url;
+    if (state.hermes.token) entries.HERMES_TOKEN = state.hermes.token;
+    if (state.hermes.model) entries.HERMES_MODEL = state.hermes.model;
+    if (Object.keys(entries).length) {
+        upsertEnvFile(VG_ENV, entries);
+        if (entries.HERMES_TOKEN) process.env.HERMES_TOKEN = entries.HERMES_TOKEN;
+        if (entries.HERMES_URL) process.env.HERMES_URL = entries.HERMES_URL;
+    }
+}
+
+export function getHermesCredentials() {
+    ensureHermesToken();
+    return {
+        url: state.hermes.url || process.env.HERMES_URL || "http://127.0.0.1:8642",
+        token: state.hermes.token || process.env.HERMES_TOKEN || readHermesApiKey() || "",
+        model: state.hermes.model || process.env.HERMES_MODEL || "hermes-agent"
+    };
+}
+
 function persistSttEnv() {
     const entries = {
         STT_PROVIDER: state.sttProvider,
@@ -106,8 +145,14 @@ export function applyGlobalOptions(patch = {}) {
     if (patch.openclawToken) state.openclaw.token = patch.openclawToken;
     if (patch.openclawModel) state.openclaw.model = patch.openclawModel;
     if (patch.hermesUrl) state.hermes.url = patch.hermesUrl;
-    if (patch.hermesToken) state.hermes.token = patch.hermesToken;
+    if (patch.hermesToken) {
+        state.hermes.token = String(patch.hermesToken);
+        process.env.HERMES_TOKEN = state.hermes.token;
+    }
     if (patch.hermesModel) state.hermes.model = patch.hermesModel;
+
+    if (state.agentProvider === "hermes") ensureHermesToken();
+
     if (typeof patch.telegramSync === "boolean") state.telegramSync = patch.telegramSync;
     if (patch.telegramTo) state.telegramTo = String(patch.telegramTo);
 
@@ -126,9 +171,13 @@ export function applyGlobalOptions(patch = {}) {
     if (state.agentProvider !== prev.agentProvider) {
         upsertEnvFile(VG_ENV, { AGENT_PROVIDER: state.agentProvider });
     }
+    if (state.agentProvider === "hermes" && state.hermes.token !== prev.hermes.token) {
+        persistHermesEnv();
+    }
     if (state.agentProvider !== prev.agentProvider ||
         state.openclaw.url !== prev.openclaw.url ||
-        state.hermes.url !== prev.hermes.url) {
+        state.hermes.url !== prev.hermes.url ||
+        state.hermes.token !== prev.hermes.token) {
         agentCache.clear();
     }
     if (state.ttsProvider !== prev.ttsProvider || state.ttsVoice !== prev.ttsVoice) {
@@ -139,8 +188,9 @@ export function applyGlobalOptions(patch = {}) {
 }
 
 export function resolveAgent(prefs = getPrefs()) {
+    ensureHermesToken();
     const provider = normalizeAgent(prefs.agent);
-    const key = `${provider}|${state.openclaw.url}|${state.hermes.url}`;
+    const key = `${provider}|${state.openclaw.url}|${state.openclaw.token}|${state.hermes.url}|${state.hermes.token}`;
     if (!agentCache.has(key)) {
         agentCache.set(key, createAgent({
             agentProvider: provider,
@@ -149,11 +199,7 @@ export function resolveAgent(prefs = getPrefs()) {
                 token: state.openclaw.token || process.env.OPENCLAW_TOKEN || "",
                 model: state.openclaw.model || process.env.OPENCLAW_MODEL || "openclaw/default"
             },
-            hermes: {
-                url: state.hermes.url || process.env.HERMES_URL || "http://127.0.0.1:8642",
-                token: state.hermes.token || process.env.HERMES_TOKEN || "",
-                model: state.hermes.model || process.env.HERMES_MODEL || "hermes-agent"
-            }
+            hermes: getHermesCredentials()
         }));
     }
     return agentCache.get(key);
@@ -175,9 +221,11 @@ export function resolveTts(prefs = getPrefs()) {
 }
 
 export async function publicOptions() {
+    ensureHermesToken();
+    const hermes = getHermesCredentials();
     const [openclawReachable, hermesReachable] = await Promise.all([
         probeOpenAi(state.openclaw.url || "http://127.0.0.1:18789", state.openclaw.token),
-        probeOpenAi(state.hermes.url || "http://127.0.0.1:8642", state.hermes.token)
+        probeOpenAiAuth(hermes.url, hermes.token)
     ]);
     return {
         current: {
@@ -198,7 +246,8 @@ export async function publicOptions() {
                 label: "Hermes Agent",
                 configured: Boolean(state.hermes.url || true),
                 reachable: hermesReachable,
-                url: state.hermes.url || "http://127.0.0.1:8642"
+                tokenSet: Boolean(hermes.token),
+                url: hermes.url
             }
         ],
         tts: [
@@ -217,4 +266,8 @@ export async function publicOptions() {
         whisperModels: WHISPER_MODELS,
         telegram: getTelegramPrefs()
     };
+}
+
+if (state.agentProvider === "hermes") {
+    ensureHermesToken();
 }

@@ -1036,8 +1036,26 @@ if (APP_MODE) {
 
 async function tauriInvoke(cmd, args = {}) {
   const invoke = window.__TAURI__?.core?.invoke;
-  if (!invoke) return null;
+  if (!invoke) {
+    throw new Error("Không kết nối được với ứng dụng desktop. Hãy mở từ icon Loa Ai Agent Bridge (không dùng trình duyệt).");
+  }
   return invoke(cmd, args);
+}
+
+function autostartHintFor(platform, enabled) {
+  if (platform === "macos") {
+    return enabled
+      ? "Đã bật. App sẽ tự chạy sau khi đăng nhập (icon trên menu bar)."
+      : "App hiện icon trên menu bar macOS. Bật tùy chọn này để gateway tự chạy sau khi đăng nhập.";
+  }
+  if (platform === "windows") {
+    return enabled
+      ? "Đã bật. App sẽ tự chạy khi Windows khởi động (icon khay thông báo, không mở cửa sổ)."
+      : "App hiện icon ở khay thông báo. Bật tùy chọn này để gateway tự chạy khi Windows khởi động.";
+  }
+  return enabled
+    ? "Đã bật. Gateway sẽ tự chạy khi máy khởi động."
+    : "Tùy chọn — bật nếu muốn gateway tự chạy khi máy khởi động.";
 }
 
 async function initDesktopSettings() {
@@ -1050,18 +1068,18 @@ async function initDesktopSettings() {
   const chk = document.getElementById("chkAutostart");
   if (!labelEl || !hintEl || !chk) return;
 
+  let platform = "unknown";
   try {
-    const platform = await tauriInvoke("desktop_platform");
+    platform = await tauriInvoke("desktop_platform") || "unknown";
     if (platform === "macos") {
       labelEl.textContent = "Khởi động khi đăng nhập (Launch at login)";
-      hintEl.textContent = "App hiện icon trên menu bar macOS. Bật tùy chọn này để gateway tự chạy sau khi đăng nhập.";
     } else if (platform === "windows") {
       labelEl.textContent = "Khởi động cùng Windows (Start with Windows)";
-      hintEl.textContent = "App hiện icon ở khay thông báo. Bật tùy chọn này để gateway tự chạy khi Windows khởi động.";
     }
 
     const enabled = await tauriInvoke("get_autostart_enabled");
     if (typeof enabled === "boolean") chk.checked = enabled;
+    hintEl.textContent = autostartHintFor(platform, !!enabled);
   } catch (err) {
     console.warn("desktop settings:", err);
     hintEl.textContent = "Không đọc được trạng thái autostart: " + err.message;
@@ -1073,6 +1091,7 @@ async function initDesktopSettings() {
     try {
       const enabled = await tauriInvoke("set_autostart_enabled", { enabled: want });
       if (typeof enabled === "boolean") chk.checked = enabled;
+      hintEl.textContent = autostartHintFor(platform, !!enabled);
     } catch (err) {
       chk.checked = !want;
       hintEl.textContent = "Không đổi được autostart: " + err.message;
@@ -2008,15 +2027,18 @@ function deviceToken() {
   try { return localStorage.getItem("vg_device_token") || ""; } catch { return ""; }
 }
 
-function helloPayload() {
+function helloPayload(opts = {}) {
   const p = currentPrefs();
   const token = deviceToken();
-  return {
+  const payload = {
     type: "hello", version: 1, features: { mcp: true }, transport: "websocket",
     device_id: DEVICE_ID, agent: p.agent, tts: p.tts, voice: p.voice,
-    ...(token ? { token } : {}),
-    audio_params: { format: "pcm", sample_rate: 16000, channels: 1, frame_duration: 60 }
+    ...(token ? { token } : {})
   };
+  if (opts.audio !== false) {
+    payload.audio_params = { format: "pcm", sample_rate: 16000, channels: 1, frame_duration: 60 };
+  }
+  return payload;
 }
 
 function fillSelect(el, items, selected) {
@@ -2089,10 +2111,12 @@ function updateReach() {
   el.className = "reach " + (agent.reachable ? "ok" : "bad");
   if (agent.reachable) {
     el.textContent = `${agent.label} reachable · ${agent.url}`;
+  } else if (agent.id === "hermes" && !agent.tokenSet) {
+    el.textContent = `${agent.label} thiếu HERMES_TOKEN — bấm «Setup Hermes API» để đồng bộ API_SERVER_KEY.`;
   } else if (agent.id === "openclaw") {
     el.textContent = `${agent.label} chưa reachable · ${agent.url}. Bấm «Kết nối OpenClaw» để tự setup.`;
   } else if (agent.id === "hermes") {
-    el.textContent = `${agent.label} chưa reachable · ${agent.url}. Bấm «Setup Hermes API».`;
+    el.textContent = `${agent.label} chưa xác thực · ${agent.url}. Kiểm tra HERMES_TOKEN = API_SERVER_KEY, hoặc bấm «Setup Hermes API».`;
   } else {
     el.textContent = `${agent.label} chưa reachable · ${agent.url}`;
   }
@@ -2361,7 +2385,7 @@ document.getElementById("send").onclick = () => {
   if (!wsT || wsT.readyState !== WebSocket.OPEN) {
     wsT = new WebSocket(pageWsUrl());
     wsT.binaryType = "arraybuffer";
-    wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload())); wsT.send(JSON.stringify({ type: "text", text })); logT.log("you", "💬 " + text); };
+    wsT.onopen = () => { wsT.send(JSON.stringify(helloPayload({ audio: false }))); wsT.send(JSON.stringify({ type: "text", text })); logT.log("you", "💬 " + text); };
     wsT.onmessage = (ev) => onMessage(ev, logT);
     wsT.onclose = () => logT.log("sys", "✕ disconnected");
   } else {

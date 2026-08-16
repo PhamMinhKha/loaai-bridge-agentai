@@ -2,6 +2,7 @@ import { Agent } from "./agent.js";
 import { openaiChatCompletions } from "./openaiChat.js";
 import { config } from "../config/config.js";
 import { startHermesRun, waitHermesRun, isRunTerminal } from "./hermesRun.js";
+import { readHermesApiKey } from "../runtime/hermesEnv.js";
 
 const history = new Map();
 
@@ -16,8 +17,18 @@ export class HermesAdapter extends Agent {
         this.model = cfg.model || "hermes-agent";
     }
 
+    /** Always use latest token — stale in-memory adapter caused 401 after Setup Hermes. */
+    _refreshToken() {
+        const key = readHermesApiKey() || process.env.HERMES_TOKEN || this.token || "";
+        if (key) this.token = key;
+    }
+
     async sendMessage({ sessionId, text, onLater } = {}) {
         if (!this.url) throw new Error("Hermes URL not configured (HERMES_URL)");
+        this._refreshToken();
+        if (!this.token) {
+            throw new Error("HERMES_TOKEN trống — bấm «Setup Hermes API» hoặc restart app");
+        }
         const key = sessionId || "default";
         const prev = history.get(key) || [];
         try {

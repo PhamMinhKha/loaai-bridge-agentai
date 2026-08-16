@@ -102,15 +102,21 @@ pub fn sync_tray_autostart(app: &AppHandle, enabled: bool) -> tauri::Result<()> 
 }
 
 pub fn navigate_main_window(app: &AppHandle, url: &str) {
+    load_main_window(app, url, true);
+}
+
+pub fn load_main_window(app: &AppHandle, url: &str, show: bool) {
     if let Some(win) = app.get_webview_window("main") {
-        #[cfg(target_os = "macos")]
-        let _ = app.set_dock_visibility(true);
-        let _ = win.show();
-        let _ = win.unminimize();
         if let Ok(parsed) = url.parse::<tauri::Url>() {
             let _ = win.navigate(parsed);
         }
-        let _ = win.set_focus();
+        if show {
+            #[cfg(target_os = "macos")]
+            let _ = app.set_dock_visibility(true);
+            let _ = win.show();
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+        }
     }
 }
 
@@ -137,9 +143,9 @@ fn hide_main_window(_app: &AppHandle, win: &tauri::WebviewWindow) {
     let _ = win.hide();
 }
 
-pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
+pub fn create_main_window(app: &AppHandle, url: &str, visible: bool) -> tauri::Result<()> {
     if app.get_webview_window("main").is_some() {
-        navigate_main_window(app, url);
+        load_main_window(app, url, visible);
         return Ok(());
     }
     let app_handle = app.clone();
@@ -147,7 +153,7 @@ pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
         .title(APP_TITLE)
         .inner_size(1024.0, 880.0)
         .resizable(true)
-        .visible(true)
+        .visible(visible)
         .on_navigation(move |nav_url| {
             let target = nav_url.as_str();
             if target.starts_with("data:text/html") {
@@ -168,8 +174,12 @@ pub fn create_main_window(app: &AppHandle, url: &str) -> tauri::Result<()> {
         })
         .build()?;
 
-    let _ = win.show();
-    let _ = win.set_focus();
+    if visible {
+        let _ = win.show();
+        let _ = win.set_focus();
+    } else {
+        hide_main_window(app, &win);
+    }
 
     let app_for_close = app.clone();
     let win_clone = win.clone();

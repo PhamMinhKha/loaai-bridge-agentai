@@ -30,7 +30,7 @@ import {
 } from "./runtime/cloudflareTunnel.js";
 import { getLanAddresses, loadTlsOptions, readPublicCertInfo, isTlsEnabled } from "./runtime/tlsSetup.js";
 import { listConversations, getConversationAudioPath } from "./runtime/conversationHistory.js";
-import { VG_ROOT } from "./runtime/envFile.js";
+import { VG_ROOT, getVgEnvPath, userEnvPath } from "./runtime/envFile.js";
 
 /** Bump when adding loopback API routes — desktop app uses /health features.apiVersion to detect stale processes. */
 const GATEWAY_API_VERSION = 2;
@@ -100,7 +100,9 @@ app.post("/api/setup/hermes", async (req, res) => {
         return res.status(403).json({ error: "Chỉ chạy setup Hermes từ máy local (127.0.0.1)" });
     }
     try {
-        res.json(await setupHermesForVoiceGateway());
+        const result = await setupHermesForVoiceGateway();
+        broadcastConfig(getPrefs());
+        res.json(result);
     } catch (e) {
         res.status(500).json({ ok: false, error: e.message });
     }
@@ -389,6 +391,12 @@ const wsOpts = {
 const port = config.port;
 const tlsEnabled = config.tlsEnabled;
 const p = getPrefs();
+
+console.log(`[env] ${getVgEnvPath()}`);
+if (p.agent === "hermes") {
+    const tok = process.env.HERMES_TOKEN || "";
+    console.log(`[hermes] token ${tok ? "configured" : "MISSING — sẽ đồng bộ từ Hermes API_SERVER_KEY"}`);
+}
 
 if (tlsEnabled) {
     const tls = await loadTlsOptions(config.tlsCertPath, config.tlsKeyPath);

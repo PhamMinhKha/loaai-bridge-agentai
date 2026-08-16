@@ -2,6 +2,34 @@
 
 Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 
+## [Unreleased] — 2026-08-16 (autostart, Hermes token, user .env)
+
+### Added
+- **`.env` theo user** khi cài MSI (Program Files chỉ đọc): `%LOCALAPPDATA%\Loa Ai Agent Bridge\.env`.
+  Bundle `.env` là mặc định; user file ghi đè. Bootstrap copy một lần khi chưa có file user.
+  Tauri truyền `VG_USER_ENV` khi spawn gateway (`src/runtime/envFile.js`, `loadVgEnv()`).
+- **`src/runtime/hermesEnv.js`**: đọc `API_SERVER_KEY` từ Hermes (`%LOCALAPPDATA%\hermes\.env` / `~/.hermes/.env`).
+- **`probeOpenAiAuth`**: kiểm tra Hermes thật sự xác thực được (HTTP 200), không chỉ “cổng mở”.
+- Autostart Windows ghi registry **Run** + **StartupApproved** (Task Manager / Settings → Startup hiện đúng trạng thái).
+
+### Changed
+- **Autostart Windows**: tự ghi registry (winreg) thay vì chỉ dựa plugin — quote path có khoảng trắng
+  (`"C:\Program Files\…\Loa Ai Agent Bridge.exe" --autostart`); sửa entry cũ bị gãy; xóa tên legacy
+  `voice-gateway-app`. Mở từ autostart → chỉ tray, không hiện cửa sổ.
+- **Khởi động cùng hệ thống** (UI): hint cập nhật ngay sau khi bật/tắt; lỗi rõ nếu mở từ trình duyệt
+  thay vì app desktop (`withGlobalTauri` + capability `remote` cho `http://127.0.0.1:*`).
+- **Hermes token**: tự đồng bộ `HERMES_TOKEN` từ `API_SERVER_KEY`; refresh token mỗi lần gửi
+  (tránh 401 vì adapter cũ); Setup Hermes ghi `.env` rồi restart gateway; UI phân biệt
+  “thiếu token” vs “chưa reachable”.
+- Hello WebSocket/ESP32 **không ghi đè agent** từ client — luôn dùng prefs server (TTS/voice vẫn nhận).
+- Tab Chat: hello không gửi `audio_params` (kênh text-only).
+
+### Fixed
+- MSI không lưu được `AGENT_PROVIDER` / `HERMES_TOKEN` vì `.env` trong Program Files read-only.
+- Autostart Windows không chạy (path có space, plugin ghi sai, hoặc bị StartupApproved tắt).
+- Hermes 401 sau Setup — token cũ trong memory; lỗi 401 giờ chỉ rõ token không khớp `API_SERVER_KEY`.
+- ESP32/web hello mang `agent: mock` làm session kẹt Mock dù server đã chọn Hermes.
+
 ## [Unreleased] — 2026-08-16
 
 ### Changed

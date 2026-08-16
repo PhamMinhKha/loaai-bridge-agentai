@@ -3,9 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { probeOpenAi } from "../agents/openaiChat.js";
+import { probeOpenAi, probeOpenAiAuth } from "../agents/openaiChat.js";
 import { applyGlobalOptions, publicOptions } from "./options.js";
-import { upsertEnvFile } from "./envFile.js";
+import { upsertEnvFile, getVgEnvPath } from "./envFile.js";
+import { restartGateway } from "./serverControl.js";
+import { hermesEnvPath, hermesHome, readHermesApiKey } from "./hermesEnv.js";
 
 const DEFAULT_PORT = 8642;
 const DEFAULT_HOST = "127.0.0.1";
@@ -14,26 +16,9 @@ const DEFAULT_MODEL = "hermes-agent";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VG_ROOT = path.join(__dirname, "..", "..");
-const VG_ENV = path.join(VG_ROOT, ".env");
+const VG_ENV = getVgEnvPath();
 
 export { isLoopback } from "./clientAddress.js";
-
-function hermesHome() {
-    if (process.env.HERMES_HOME) return process.env.HERMES_HOME;
-    if (process.platform === "win32") {
-        return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "hermes");
-    }
-    return path.join(os.homedir(), ".hermes");
-}
-
-function hermesEnvPath() {
-    const home = hermesHome();
-    const candidates = [
-        path.join(home, ".env"),
-        path.join(os.homedir(), ".hermes", ".env")
-    ];
-    return candidates.find((p) => fs.existsSync(p)) || candidates[0];
-}
 
 export function findHermesBin() {
     const home = hermesHome();
@@ -72,7 +57,7 @@ function run(cmd, args, timeoutMs = 45000) {
 
 async function waitReachable(url, token, attempts = 12) {
     for (let i = 0; i < attempts; i++) {
-        if (await probeOpenAi(url, token, 1500)) return true;
+        if (await probeOpenAiAuth(url, token, 1500)) return true;
         await new Promise((r) => setTimeout(r, 1000));
     }
     return false;
@@ -84,13 +69,9 @@ export async function setupHermesForVoiceGateway() {
     const hermesFile = hermesEnvPath();
     const bin = findHermesBin();
 
-    let key = DEFAULT_KEY;
-    if (fs.existsSync(hermesFile)) {
-        const m = fs.readFileSync(hermesFile, "utf8").match(/^API_SERVER_KEY=(.*)$/m);
-        if (m && m[1].trim()) key = m[1].trim();
-    }
+    let key = readHermesApiKey() || DEFAULT_KEY;
 
-    const already = await probeOpenAi(url, key, 1500);
+    const already = await probeOpenAiAuth(url, key, 1500);
     steps.push(already
         ? `API Hermes đã reachable tại ${url}`
         : `API Hermes chưa reachable tại ${url} — sẽ ghi .env và restart gateway`);
@@ -138,6 +119,12 @@ export async function setupHermesForVoiceGateway() {
     }
 
     const options = await publicOptions();
+    steps.push("Restart Voice Gateway để nạp HERMES_TOKEN…");
+    try {
+        restartGateway({});
+    } catch (e) {
+        steps.push(`Restart Voice Gateway: ${e.message} — thoát app (tray → Thoát) rồi mở lại`);
+    }
     return {
         ok: reachable,
         restarted,

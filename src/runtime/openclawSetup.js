@@ -5,14 +5,14 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { probeOpenAi } from "../agents/openaiChat.js";
 import { applyGlobalOptions, publicOptions } from "./options.js";
-import { upsertEnvFile } from "./envFile.js";
+import { upsertEnvFile, getVgEnvPath } from "./envFile.js";
 
 const DEFAULT_PORT = 18789;
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_MODEL = "openclaw/default";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const VG_ENV = path.join(__dirname, "..", "..", ".env");
+const VG_ENV = getVgEnvPath();
 
 function openclawHome() {
     if (process.env.OPENCLAW_HOME) return process.env.OPENCLAW_HOME;

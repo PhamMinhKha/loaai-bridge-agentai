@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { config } from "../config/config.js";
-import { probeOpenAi } from "../agents/openaiChat.js";
+import { probeOpenAi, probeOpenAiAuth } from "../agents/openaiChat.js";
 import { getSttPrefs } from "./sttRuntime.js";
 import { VG_ENV, VG_ROOT } from "./envFile.js";
 
@@ -105,7 +105,7 @@ export async function runDiagnostics() {
 
     const [openclawOk, hermesOk] = await Promise.all([
         probeOpenAi(config.openclaw.url, config.openclaw.token, 2000),
-        probeOpenAi(config.hermes.url, config.hermes.token, 2000)
+        probeOpenAiAuth(config.hermes.url, config.hermes.token, 2000)
     ]);
     checks.push(check(
         "openclaw",
