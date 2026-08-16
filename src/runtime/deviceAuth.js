@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../config/config.js";
-import { isLoopback } from "./clientAddress.js";
+import { isLoopback, isPrivateLan } from "./clientAddress.js";
 
 export function tokensEqual(provided, secret) {
     const a = Buffer.from(String(provided ?? ""), "utf8");
@@ -11,13 +11,15 @@ export function tokensEqual(provided, secret) {
 
 /**
  * Remote clients must send hello.token === DEVICE_TOKEN_SECRET when
- * REQUIRE_DEVICE_TOKEN=true. Direct loopback (Tauri / local tests) is exempt.
+ * REQUIRE_DEVICE_TOKEN=true. Loopback (Tauri / local tests) and LAN (RFC1918) are exempt.
+ * Internet via Cloudflare (proxied 127.0.0.1) still requires token.
  */
 export function checkDeviceHello(message, req, opts = {}) {
     const requireToken = opts.requireDeviceToken ?? config.requireDeviceToken;
     const secret = opts.deviceTokenSecret ?? config.deviceTokenSecret;
     if (!requireToken) return { ok: true };
     if (req && isLoopback(req)) return { ok: true };
+    if (req && isPrivateLan(req)) return { ok: true };
     if (!secret) {
         return { ok: false, code: "AUTH_REQUIRED", message: "Device token required" };
     }
@@ -29,5 +31,8 @@ export function checkDeviceHello(message, req, opts = {}) {
 
 export function remoteRequiresAuth(req, opts = {}) {
     const requireToken = opts.requireDeviceToken ?? config.requireDeviceToken;
-    return Boolean(requireToken && !(req && isLoopback(req)));
+    if (!requireToken) return false;
+    if (req && isLoopback(req)) return false;
+    if (req && isPrivateLan(req)) return false;
+    return true;
 }

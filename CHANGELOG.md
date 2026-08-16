@@ -10,6 +10,7 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   Tauri truyền `VG_USER_ENV` khi spawn gateway (`src/runtime/envFile.js`, `loadVgEnv()`).
 - **`src/runtime/hermesEnv.js`**: đọc `API_SERVER_KEY` từ Hermes (`%LOCALAPPDATA%\hermes\.env` / `~/.hermes/.env`).
 - **`probeOpenAiAuth`**: kiểm tra Hermes thật sự xác thực được (HTTP 200), không chỉ “cổng mở”.
+- **`isPrivateLan()`** (`clientAddress.js`): nhận diện IP LAN (RFC1918) để miễn device token.
 - Autostart Windows ghi registry **Run** + **StartupApproved** (Task Manager / Settings → Startup hiện đúng trạng thái).
 
 ### Changed
@@ -34,6 +35,11 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 - **LAN không vào được** (`http://192.168.x.x:8888/`) sau khi bật Cloudflare — gateway bind `127.0.0.1`
   thay vì `0.0.0.0`. Giờ luôn listen `0.0.0.0` (LAN + localhost + cloudflared vẫn vào `127.0.0.1`);
   bật tunnel không còn ghi `HOST=127.0.0.1` vào `.env`.
+- **ESP32 LAN báo “Device not authenticated”** khi `REQUIRE_DEVICE_TOKEN=true`: chat trên PC (127.0.0.1)
+  được miễn token nhưng ESP32 qua IP LAN bị chặn. Giờ **RFC1918 miễn token**; chỉ client qua Cloudflare
+  (header proxy) bắt buộc `hello.token`.
+- **ESP32 Opus lỗi auth lặt vặt / vẫn trả lời trễ**: sau hello Opus, handler WebSocket cũ vẫn chạy song song
+  với xiaozhi → ném `Device not authenticated`. Giờ tắt handler cũ khi chuyển sang xiaozhi.
 
 ## [Unreleased] — 2026-08-16
 

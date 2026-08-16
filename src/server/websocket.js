@@ -48,6 +48,7 @@ export function createWebSocketServer(server, opts = {}) {
         let prefs = { ...getPrefs() };
         let pendingConvId = null;
         let xiaozhiUnregister = null;
+        let xiaozhiMode = false;
 
         const send = (obj) => sendJson(socket, obj, "ws");
 
@@ -212,6 +213,7 @@ export function createWebSocketServer(server, opts = {}) {
         };
 
         socket.on("message", async (data, isBinary) => {
+            if (xiaozhiMode) return;
             try {
                 if (isBinary) {
                     if (needsAuth && !authed) return;
@@ -253,6 +255,7 @@ export function createWebSocketServer(server, opts = {}) {
                         if (message.audio_params && (message.audio_params.format === "opus" || message.audio_params.format === "pcm")) {
                             const fmt = message.audio_params.format;
                             unregisterBroadcast();
+                            xiaozhiMode = true;
                             xiaozhiUnregister = handleXiaozhi(socket, fmt, prefs, { deviceId: message.device_id });
                             return;
                         }
