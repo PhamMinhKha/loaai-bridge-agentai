@@ -694,7 +694,7 @@
         <input type="text" id="wsUrl" readonly />
         <button class="copybtn" id="copyWs">Copy</button>
       </div>
-      <p class="card-desc" style="margin-top:.65rem;margin-bottom:.35rem">Internet (Cloudflare Named Tunnel): <code>wss://voice.yourdomain.com/ws</code> — hostname cố định. Tắt WSS tự ký, <code>HOST=127.0.0.1</code>, bật <code>REQUIRE_DEVICE_TOKEN</code>. Không dùng <code>*.trycloudflare.com</code> (đổi mỗi lần chạy).</p>
+      <p class="card-desc" style="margin-top:.65rem;margin-bottom:.35rem">Internet (Cloudflare Named Tunnel): <code>wss://voice.yourdomain.com/ws</code> — hostname cố định. Tắt WSS tự ký, giữ <code>HOST=0.0.0.0</code> (LAN + tunnel), bật <code>REQUIRE_DEVICE_TOKEN</code>. Không dùng <code>*.trycloudflare.com</code> (đổi mỗi lần chạy).</p>
       <label class="port-label" for="inpDeviceToken">Device token (hello.token)</label>
       <div class="urlrow" style="margin-top:.35rem">
         <input type="password" id="inpDeviceToken" placeholder="DEVICE_TOKEN_SECRET — bắt buộc khi mở /ws ra internet" autocomplete="off" />
@@ -876,7 +876,7 @@ HERMES_URL=http://127.0.0.1:8642</code></div>
       <p class="reach" id="tlsHint" style="margin-top:.5rem;font-size:.76rem">
         ESP32 có thể <b>tự nhận cert</b> qua hello WSS (lần đầu bỏ qua verify TLS, lưu <code>tls_cert</code> vào NVS).
         Hoặc copy cert bên dưới nếu firmware hỗ trợ nhập PEM.
-        <b>Cloudflare Tunnel:</b> giữ tắt WSS này — Cloudflare cấp HTTPS/WSS; đặt <code>HOST=127.0.0.1</code> trong <code>.env</code>.
+        <b>Cloudflare Tunnel:</b> giữ tắt WSS này — Cloudflare cấp HTTPS/WSS. Gateway vẫn bind <code>0.0.0.0</code> để ESP32 vào được qua IP LAN.
       </p>
       <div class="cfg" id="tlsCertBlock" style="margin-top:.5rem;display:none">
         <div class="full">

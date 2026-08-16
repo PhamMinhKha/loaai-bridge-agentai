@@ -54,7 +54,7 @@ function newDeviceToken() {
 
 export function getServerInfo({ includeSecrets = false } = {}) {
     const port = Number(process.env.PORT || config.port || 8888);
-    const host = process.env.HOST || config.host || "0.0.0.0";
+    const host = "0.0.0.0";
     const tlsEnabled = tlsEnabledFromEnv();
     const certPath = certPathFromEnv();
     const keyPath = keyPathFromEnv();
@@ -152,7 +152,7 @@ export function applyServerSettings({
             throw new Error("Nhập hostname Cloudflare (vd voice.yourdomain.com)");
         }
         entries.PUBLIC_ENABLED = "true";
-        entries.HOST = "127.0.0.1";
+        entries.HOST = "0.0.0.0";
         entries.TLS_ENABLED = "false";
         entries.REQUIRE_DEVICE_TOKEN = "true";
         const existing = String(deviceTokenSecret ?? process.env.DEVICE_TOKEN_SECRET ?? config.deviceTokenSecret ?? "").trim();

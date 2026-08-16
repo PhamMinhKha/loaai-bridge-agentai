@@ -23,12 +23,17 @@ Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
   “thiếu token” vs “chưa reachable”.
 - Hello WebSocket/ESP32 **không ghi đè agent** từ client — luôn dùng prefs server (TTS/voice vẫn nhận).
 - Tab Chat: hello không gửi `audio_params` (kênh text-only).
+- Gateway HTTP luôn bind **`0.0.0.0`**; log in IP LAN thật khi khởi động. UI/docs bỏ khuyến nghị
+  `HOST=127.0.0.1` khi dùng Cloudflare Tunnel.
 
 ### Fixed
 - MSI không lưu được `AGENT_PROVIDER` / `HERMES_TOKEN` vì `.env` trong Program Files read-only.
 - Autostart Windows không chạy (path có space, plugin ghi sai, hoặc bị StartupApproved tắt).
 - Hermes 401 sau Setup — token cũ trong memory; lỗi 401 giờ chỉ rõ token không khớp `API_SERVER_KEY`.
 - ESP32/web hello mang `agent: mock` làm session kẹt Mock dù server đã chọn Hermes.
+- **LAN không vào được** (`http://192.168.x.x:8888/`) sau khi bật Cloudflare — gateway bind `127.0.0.1`
+  thay vì `0.0.0.0`. Giờ luôn listen `0.0.0.0` (LAN + localhost + cloudflared vẫn vào `127.0.0.1`);
+  bật tunnel không còn ghi `HOST=127.0.0.1` vào `.env`.
 
 ## [Unreleased] — 2026-08-16
 

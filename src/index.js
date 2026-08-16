@@ -427,9 +427,19 @@ if (tlsEnabled) {
 } else {
     const server = http.createServer(app);
     createWebSocketServer(server, wsOpts);
-    server.listen(port, config.host, () => {
-        console.log(`Loa Ai Agent Bridge listening on ${config.host}:${port} (agent=${p.agent} tts=${p.tts})`);
+    // Always 0.0.0.0: LAN (ESP32) + localhost + Cloudflare (vẫn vào 127.0.0.1).
+    // HOST=127.0.0.1 khi bật tunnel từng làm chết http://<IP-LAN>:8888/.
+    const listenHost = "0.0.0.0";
+    server.listen(port, listenHost, () => {
+        console.log(`Loa Ai Agent Bridge listening on ${listenHost}:${port} (agent=${p.agent} tts=${p.tts})`);
         console.log(`  local:  http://127.0.0.1:${port}/`);
-        console.log(`  LAN:    http://<IP-PC>:${port}/   (máy khác cùng Wi‑Fi/LAN)`);
+        const lanIps = getLanAddresses();
+        if (lanIps.length) {
+            for (const ip of lanIps) {
+                console.log(`  LAN:    http://${ip}:${port}/   ws://${ip}:${port}/ws`);
+            }
+        } else {
+            console.log(`  LAN:    http://<IP-PC>:${port}/   (máy khác cùng Wi‑Fi/LAN)`);
+        }
     });
 }
