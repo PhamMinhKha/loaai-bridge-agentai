@@ -2,6 +2,18 @@
 
 Tất cả thay đổi đáng chú ý của dự án được ghi tại đây.
 
+## [Unreleased] — 2026-08-25 (Ubuntu VPS CLI)
+
+### Added
+- **Chạy trên VPS Ubuntu bằng dòng lệnh**: [SETUP.md](./SETUP.md) mục **3c** (apt, Node, `.env`, systemd, UFW, Nginx tùy chọn).
+- **`scripts/setup-vps-ubuntu.sh`**: menu chọn 1–8 / 0, hoặc `sudo ./scripts/setup-vps-ubuntu.sh --auto`.
+  `npm run setup:vps`. Cài apt/Node/npm, `.venv`, `.env` VPS (token, Whisper `small`, Edge TTS), systemd, UFW.
+  `apt update` không chặn hết nếu một repo hỏng; bắt buộc có **npm** (không chỉ `node`).
+- **`scripts/voice-gateway.service.example`**: unit systemd mẫu.
+
+### Changed
+- `scripts/setup-dev.sh`: xuống dòng LF (bash trên Linux không nhận `set -o pipefail` nếu file CRLF).
+
 ## [Unreleased] — 2026-08-16 (autostart, Hermes token, user .env)
 
 ### Added

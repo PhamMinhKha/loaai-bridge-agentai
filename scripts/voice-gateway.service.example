@@ -1,0 +1,22 @@
+# /etc/systemd/system/voice-gateway.service
+# sudo cp scripts/voice-gateway.service.example /etc/systemd/system/voice-gateway.service
+# Chi tiết: SETUP.md mục "3c. Kế hoạch chạy trên VPS Ubuntu"
+
+[Unit]
+Description=Loa Ai Agent Bridge (voice-gateway)
+After=network.target
+
+[Service]
+Type=simple
+User=loa
+Group=loa
+WorkingDirectory=/opt/voice-gateway
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+# Whisper + agent có thể giữ RAM lâu
+MemoryMax=4G
+
+[Install]
+WantedBy=multi-user.target

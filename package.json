@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup:dev": "node scripts/setup-dev.js",
+    "setup:vps": "bash scripts/setup-vps-ubuntu.sh",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "tauri:dev": "tauri dev",

@@ -100,6 +100,198 @@ Chạy nền Windows đơn giản: `start_vg.bat` (cùng thư mục repo).
 
 ---
 
+## 3c. Kế hoạch chạy trên VPS Ubuntu (dòng lệnh)
+
+Không dùng app Tauri trên VPS. Gateway là Node (`npm start`) + Python (`.venv` cho Whisper/TTS). Agent (Hermes/OpenClaw) phải chạy **cùng máy** hoặc URL trong `.env` trỏ được từ VPS.
+
+### Script setup (menu 1/2/3 hoặc `--auto`)
+
+Trên VPS, trong thư mục repo:
+
+```bash
+chmod +x scripts/setup-vps-ubuntu.sh
+./scripts/setup-vps-ubuntu.sh
+```
+
+Hoặc: `npm run setup:vps`
+
+Hiện menu — gõ số rồi Enter:
+
+| Số | Việc |
+|----|------|
+| **1** | Setup tự động đầy đủ: apt, Node 20, npm/.venv, `.env` VPS + token, systemd |
+| **2** | Chỉ cài phụ thuộc + npm + `.venv` (không systemd) |
+| **3** | Cài / bật systemd |
+| 4 | Ghi `.env` kiểu VPS (token, Whisper `small`, Edge TTS) |
+| 5 | Mở UFW (SSH + cổng 8888) |
+| 6 | Health / trạng thái |
+| 7 / 8 | Restart / stop service |
+| **0** | Thoát |
+
+Không hỏi gì, chạy hết bước 1 + firewall:
+
+```bash
+sudo ./scripts/setup-vps-ubuntu.sh --auto
+```
+
+Cần `sudo` cho apt, systemd, ufw. App chạy bằng user hiện tại (hoặc `SUDO_USER` nếu gọi bằng root).
+
+Các bước tay bên dưới chỉ cần nếu không dùng script.
+
+### A. Chuẩn bị máy
+
+SSH vào VPS (Ubuntu 22.04 / 24.04). Cần RAM đủ cho Whisper: CPU `base`/`small` ~2–4 GB; `medium` thường ≥8 GB. Swap 2 GB nếu RAM nhỏ.
+
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential python3 python3-venv python3-pip python3-dev \
+  ffmpeg libopus-dev pkg-config
+```
+
+Node.js 20 (repo NodeSource hoặc nvm):
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v   # >= 18
+```
+
+User thường (không chạy gateway bằng root):
+
+```bash
+sudo useradd -m -s /bin/bash loa
+sudo mkdir -p /opt/voice-gateway
+sudo chown loa:loa /opt/voice-gateway
+```
+
+### B. Clone và cài
+
+```bash
+sudo -u loa -H bash -lc '
+  cd /opt/voice-gateway
+  git clone <URL-repo> .
+  chmod +x scripts/setup-dev.sh
+  ./scripts/setup-dev.sh
+'
+```
+
+Hoặc đã có Node trên PATH của `loa`:
+
+```bash
+sudo -u loa -H bash -lc 'cd /opt/voice-gateway && npm run setup:dev'
+```
+
+`npm install` cần `build-essential` + `libopus-dev` để compile `@discordjs/opus`. Nếu opus native lỗi, gateway vẫn có thể chạy nhờ `opusscript` (chậm hơn).
+
+### C. `.env` trên VPS
+
+Sửa `/opt/voice-gateway/.env` (script đã copy từ `.env.example` và trỏ `WHISPER_PYTHON` / `TTS_PYTHON` vào `.venv`).
+
+**VPS công khai (ESP32 / client internet):**
+
+```
+HOST=0.0.0.0
+PORT=8888
+TLS_ENABLED=false
+REQUIRE_DEVICE_TOKEN=true
+DEVICE_TOKEN_SECRET=<chuỗi dài, ngẫu nhiên>
+STT_PROVIDER=whisper
+WHISPER_MODEL=small
+TTS_PROVIDER=edge
+AGENT_PROVIDER=hermes
+HERMES_URL=http://127.0.0.1:8642
+HERMES_TOKEN=<trùng API_SERVER_KEY>
+```
+
+- `pyttsx3` trên Ubuntu headless thường thiếu engine giọng — dùng `edge` hoặc `google` (cần mạng).
+- Mở cổng 8888 trên firewall **chỉ** khi client kết nối thẳng IP VPS. An toàn hơn: `HOST=127.0.0.1` + Nginx/Caddy TLS, hoặc Cloudflare Tunnel (cùng logic mục 4b, đường dẫn Linux: `~/.cloudflared/`).
+
+Tạo token:
+
+```bash
+openssl rand -hex 32
+```
+
+### D. Chạy tay (kiểm tra)
+
+```bash
+sudo -u loa -H bash -lc 'cd /opt/voice-gateway && npm start'
+```
+
+Từ máy khác (hoặc trên VPS):
+
+```bash
+curl -sS http://127.0.0.1:8888/health
+```
+
+WebSocket: `ws://<IP-VPS>:8888/ws` (hoặc `wss://...` sau reverse proxy). Hello remote phải có `token` khi `REQUIRE_DEVICE_TOKEN=true`.
+
+Ctrl+C dừng. Không để process chạy foreground trên SSH — dùng systemd.
+
+### E. systemd (sống sau reboot)
+
+Copy [scripts/voice-gateway.service.example](./scripts/voice-gateway.service.example):
+
+```bash
+sudo cp /opt/voice-gateway/scripts/voice-gateway.service.example /etc/systemd/system/voice-gateway.service
+sudo nano /etc/systemd/system/voice-gateway.service   # sửa User/WorkingDirectory nếu khác
+sudo systemctl daemon-reload
+sudo systemctl enable --now voice-gateway
+sudo systemctl status voice-gateway
+journalctl -u voice-gateway -f
+```
+
+Cập nhật code:
+
+```bash
+sudo -u loa -H bash -lc 'cd /opt/voice-gateway && git pull && npm install && .venv/bin/pip install -r requirements.txt'
+sudo systemctl restart voice-gateway
+```
+
+### F. Firewall
+
+```bash
+sudo ufw allow OpenSSH
+# Chỉ khi bind 0.0.0.0 và client vào thẳng PORT:
+sudo ufw allow 8888/tcp
+sudo ufw enable
+sudo ufw status
+```
+
+Nếu chỉ Nginx/Caddy/cloudflared vào `127.0.0.1:8888` thì **không** mở 8888 ra ngoài.
+
+### G. HTTPS (tùy chọn, Nginx)
+
+Gateway HTTP nội bộ; Nginx cấp Let’s Encrypt. ESP32 dùng `wss://domain/ws`.
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name voice.example.com;
+    # ssl_certificate / ssl_certificate_key do certbot ghi
+
+    location / {
+        proxy_pass http://127.0.0.1:8888;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+`.env`: `HOST=127.0.0.1`, `TLS_ENABLED=false` (TLS ở Nginx, không chồng self-signed).
+
+### H. Việc không làm trên VPS
+
+- `npm run tauri:dev` / `tauri:build` — cần GUI, không phải chế độ VPS.
+- `WHISPER_MODEL=medium` trên VPS 1–2 GB RAM — OOM. Bắt đầu `base` hoặc `small`.
+- `REQUIRE_DEVICE_TOKEN=false` khi `HOST=0.0.0.0` và port public — ai có IP cũng nói với agent.
+
+---
+
 ## 3b. App desktop (Tauri)
 
 Yêu cầu thêm: **Rust** (`rustc`, `cargo`) và **Node** trên PATH.
